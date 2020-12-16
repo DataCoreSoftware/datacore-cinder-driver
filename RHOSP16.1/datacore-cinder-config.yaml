@@ -1,0 +1,23 @@
+parameter_defaults:
+  ContainerCinderVolumeImage: 192.168.25.2:8787/rhosp-rhel8/openstack-cinder-volume-datacore:latest
+  Debug: true
+  ExtraConfig:
+    cinder::config::cinder_config:
+      datacore/volume_driver:
+        value: cinder.volume.drivers.datacore.iscsi.ISCSIVolumeDriver
+      datacore/san_ip:
+        value: 10.200.0.43
+      datacore/san_login:
+        value: <username>
+      datacore/san_password:
+        value: <password>
+      datacore/volume_backend_name:
+        value: datacore_iscsi
+      datacore/datacore_disk_type:
+        value: single
+      datacore/datacore_disk_pools:
+        value: Disk pool 1
+      datacore/datacore_api_timeout:
+        value: 300
+    cinder_user_enabled_backends: ['datacore']
+    nova::compute::libvirt::libvirt_virt_type: 'qemu'

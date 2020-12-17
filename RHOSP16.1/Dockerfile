@@ -14,7 +14,7 @@ USER root
 ARG LICENSE_PATH="/licenses"
 ARG CINDER_PATH="/usr/lib/python3.6/site-packages/cinder/volume/drivers/datacore"
 
-RUN yum -y update-minimal --security --sec-severity=Important --sec-severity=Critical
+RUN yum -y update-minimal --security --sec-severity=Important --sec-severity=Critical --sec-severity=Moderate
 
 # install python module websocket_client (dependent module for Datacore Cinder driver)
 RUN pip3 install websocket_client==0.54.0

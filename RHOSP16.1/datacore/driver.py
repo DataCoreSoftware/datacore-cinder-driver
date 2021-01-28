@@ -578,10 +578,6 @@ class DataCoreVolumeDriver(driver.BaseVD):
             self._api.get_logical_disks())
 
         try:
-            volume_virtual_disk = self._set_virtual_disk_size(
-                volume_virtual_disk,
-                self._get_size_in_bytes(volume['size']))
-
             disk_type = volume_options[self.DATACORE_DISK_TYPE_KEY]
             if disk_type == self.DATACORE_MIRRORED_DISK:
                 pools = self._get_available_disk_pools(pool_names)

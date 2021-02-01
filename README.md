@@ -1,18 +1,20 @@
-# DataCore SANsymphony Cinder volume driver for RHOSP16.1
+# DataCore SANsymphony Cinder volume driver for RHOSP 16.1
 
 ## Overview
 
-This page provides detailed steps on how to install containerized Cinder driver plugin for DataCore SANsymphony in a RHOSP 16.1 environment.
+DataCore SANsymphony containerized Cinder driver provides Red Hat OpenStack Platforms' (RHOSP) Compute instances with access to the SANsymphony(TM) Software-defined Storage Platform. When volumes are created in RHOSP, the driver creates corresponding virtual disks in the SANsymphony server group. When a volume is attached to an instance in RHOSP, a Linux host is registered and the corresponding virtual disk is served to the host in the SANsymphony server group.
+
+This page provides detailed steps on how to install, configure and operate the containerized Cinder driver plugin for DataCore SANsymphony in a RHOSP 16.1 environment.
 
 ## Prerequisites
 
 * Deployed overcloud with director as per the instructions in [Director Installation and Usage Guide](https://access.redhat.com/documentation/en-us/red_hat_openstack_platform/16.1/html-single/director_installation_and_usage/index).
 
-* DataCore SANsymphony server deployed and configured.
+* DataCore SANsymphony 10 PSP6 or later server deployed and configured.
 
 ## Steps
 
-There are two options to deploy the containerized cinder driver based on the overcloud nodes' network configuration where the cinder service is configured. In this example, cinder service is installed in a controller node. If the controller node is able to access external network then follow the first option. Otherwise the container image has to be pulled a priori in the director and it can be deployed from the local registry. Both options are described below.
+There are two options to deploy the containerized cinder driver based on the overcloud nodes' network configuration where the cinder service is configured. In this example, cinder service is configured in a controller node. If the controller node is able to access external network then follow the first option. Otherwise the container image has to be pulled a priori in the director and it can be deployed from the local registry. Both options are described below.
 
 
 ### Option 1: Controller node has external network access
@@ -106,3 +108,70 @@ $ openstack overcloud deploy --templates \
     -e /home/stack/templates/datacore-cinder-config.yaml
 ```
 
+## Configuration options
+
+The options below can be configured in the custom environment files.
+
+Configuration options and default values:
+
+ * `datacore_disk_pools = None`
+
+Sets the pools to use for the DataCore RHOSP Cinder Volume Driver. This option acts like a filter and any number of pools may be specified. The list of specified pools will be used to select the storage sources needed for virtual disks: one for single or two for mirrored. Selection is based on the pools with the most free space.
+
+ * `datacore_disk_type = single`
+
+Sets the storage profile of the virtual disk. The default setting is Normal. Other valid values include the standard storage profiles (Critical, High, Low, and Archive) and the names of custom profiles that have been created.
+
+ * `datacore_api_timeout = 300`
+
+Sets the number of seconds to wait for a response from a DataCore API call.
+
+ * `datacore_disk_failed_delay = 15`
+
+Sets the number of seconds to wait for the SANsymphony virtual disk to come out of the “Failed” state.
+
+ * `datacore_iscsi_unallowed_targets = []`
+
+Sets a list of iSCSI targets that cannot be used to attach to the volume. By default, the DataCore iSCSI volume driver attaches a volume through all target ports with the Front-end role enabled.
+
+
+To prevent the DataCore iSCSI volume driver from using some front-end targets in volume attachment, specify this option and list the iqn and target machine for each target as the value, such as `<iqn:target name>, <iqn:target name>, <iqn:target name>`. For example, `<iqn.2000-08.com.company:Server1-1, iqn.2000-08.com.company:Server2-1, iqn.2000-08.com.company:Server3-1>`.
+
+ * `datacore_iscsi_chap_enabled = False`
+
+Sets the CHAP authentication for the iSCSI targets that are used to serve the volume. This option is disabled by default and will allow hosts (OpenStack Compute nodes) to connect to iSCSI storage back-ends without authentication. To enable CHAP authentication, which will prevent hosts (OpenStack Compute nodes) from connecting to back-ends without authentication, set this option to `True`.
+
+
+In addition, specify the location where the DataCore volume driver will store CHAP secrets by setting the `datacore_iscsi_chap_storage` option.
+
+
+This option is used in the server group back-end configuration only. The driver will enable CHAP only for involved target ports, therefore, not all DataCore Servers may have CHAP configured. _Before enabling CHAP, ensure that there are no SANsymphony volumes attached to any instances_.
+
+ * `datacore_iscsi_chap_storage = None`
+
+Sets the path to the iSCSI CHAP authentication password storage file.
+
+
+_CHAP secrets are passed from OpenStack Block Storage to compute in clear text. This communication should be secured to ensure that CHAP secrets are not compromised. This can be done by setting up file permissions. Before changing the CHAP configuration, ensure that there are no SANsymphony volumes attached to any instances_.
+
+## Creating Volume Types
+
+Before using any volume with DataCore SANsymphony server, the corresponding volume type needs to be created and the appropriate `volume_backend_name` needs to be set.
+```
+(overcloud) $ openstack volume type create datacore
+(overcloud) $ openstack volume type set --property volume_backend_name='datacore_iscsi' datacore
+```
+
+### Detaching Volumes and Terminating Instances
+
+Notes about the expected behavior of SANsymphony software when detaching volumes and terminating instances in OpenStack:
+
+
+1. When a volume is detached from a host in OpenStack, the virtual disk will be unserved from the host in SANsymphony, but the virtual disk will not be deleted.
+2. If all volumes are detached from a host in OpenStack, the host will remain registered and all virtual disks will be unserved from that host in SANsymphony. The virtual disks will not be deleted.
+3. If an instance is terminated in OpenStack, the virtual disk for the instance will be unserved from the host and either be deleted or remain as unserved virtual disk depending on the option selected when terminating.
+
+
+## Support
+
+In the event that a support bundle is needed, the administrator should save the files from the `/var/log/containers/cinder` directory on the overcloud node where the containerized driver is deployed and attach to DataCore Technical Support incident manually.

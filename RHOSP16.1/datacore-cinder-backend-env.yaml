@@ -1,5 +1,5 @@
 parameter_defaults:
-  ContainerCinderVolumeImage: <local_registry>:8787/rhosp-rhel8/openstack-cinder-volume-datacore:latest
+  ContainerCinderVolumeImage: registry.connect.redhat.com/datacore-software/openstack-cinder-volume-datacore-rhosp-16-1:latest
   CinderEnableIscsiBackend: false
   Debug: true
   ControllerExtraConfig:

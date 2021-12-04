@@ -32,6 +32,7 @@ from suds.sax import element
 from suds import wsdl
 from suds import wsse
 from suds import xsd
+from suds.xsd.doctor import Import, ImportDoctor
 
 from cinder.i18n import _
 from cinder import utils as cinder_utils
@@ -186,12 +187,18 @@ class DataCoreClient(object):
         username_token = wsse.UsernameToken(username, password)
         security_options.tokens.append(username_token)
 
+        imp = Import('http://www.w3.org/2001/XMLSchema', location='http://www.w3.org/2001/XMLSchema.xsd')
+        imp.filter.add('http://schemas.microsoft.com/2003/10/Serialization/Arrays')
+        imp.filter.add('http://schemas.microsoft.com/2003/10/Serialization/')
+        imp.filter.add('http://schemas.datacontract.org/2004/07/DataCore.Executive')
+
         self._executive_service_client = suds_client.Client(
             executive_service_endpoint['http_endpoint'] + '?singlewsdl',
             nosend=True,
             timeout=self.timeout,
             wsse=security_options,
-            plugins=[FaultDefinitionsFilter()])
+            plugins=[FaultDefinitionsFilter()],
+            doctor=ImportDoctor(imp))
 
         self._update_storage_services_endpoint(executive_service_endpoint)
 

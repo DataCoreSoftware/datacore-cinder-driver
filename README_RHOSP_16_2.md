@@ -1,4 +1,4 @@
-# DataCore SANsymphony Cinder volume driver for RHOSP 16.1
+# DataCore SANsymphony Cinder volume driver for RHOSP 16.2
 
 ## Overview
 
@@ -16,6 +16,7 @@ This page provides detailed steps on how to install, configure and operate the c
 
 There are two options to deploy the containerized cinder driver based on the overcloud nodes' network configuration where the cinder service is configured. In this example, cinder service is configured in a controller node. If the controller node is able to access external network then follow the first option. Otherwise the container image has to be pulled a priori in the director and it can be deployed from the local registry. Both options are described below.
 
+For full detailed instruction of all options please refer to https://docs.openstack.org/cinder/queens/configuration/block-storage/drivers/datacore-volume-driver.html
 
 ### Option 1: Controller node has external network access
 
@@ -126,7 +127,7 @@ Sets the storage profile of the virtual disk. The default setting is Normal. Oth
 
 Sets the number of seconds to wait for a response from a DataCore API call.
 
- * `datacore_disk_failed_delay = 15`
+ * `datacore_disk_failed_delay = 300`
 
 Sets the number of seconds to wait for the SANsymphony virtual disk to come out of the “Failed” state.
 

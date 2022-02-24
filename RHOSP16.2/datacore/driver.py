@@ -15,6 +15,7 @@
 """Base Driver for DataCore SANsymphony storage array."""
 
 import time
+import math
 
 from oslo_config import cfg
 from oslo_log import log as logging
@@ -26,6 +27,7 @@ import six
 from cinder import context as cinder_context
 from cinder import exception as cinder_exception
 from cinder.i18n import _
+from cinder import interface
 from cinder import utils as cinder_utils
 from cinder.volume import driver
 from cinder.volume.drivers.datacore import api
@@ -57,7 +59,7 @@ datacore_opts = [
                help='Seconds to wait for a response from a '
                     'DataCore API call.'),
     cfg.IntOpt('datacore_disk_failed_delay',
-               default=15,
+               default=300,
                min=0,
                help='Seconds to wait for DataCore virtual '
                     'disk to come out of the "Failed" state.'),
@@ -67,7 +69,8 @@ CONF = cfg.CONF
 CONF.register_opts(datacore_opts)
 
 
-class DataCoreVolumeDriver(driver.BaseVD):
+@interface.volumedriver
+class DataCoreVolumeDriver(driver.VolumeDriver):
     """DataCore SANsymphony base volume driver."""
 
     STORAGE_PROTOCOL = 'N/A'
@@ -246,7 +249,6 @@ class DataCoreVolumeDriver(driver.BaseVD):
         :param snapshot: Snapshot object
         :return: Dictionary of changes to the volume object to be persisted
         """
-
         return self._create_volume_from(volume, snapshot)
 
     def create_cloned_volume(self, volume, src_vref):
@@ -269,6 +271,7 @@ class DataCoreVolumeDriver(driver.BaseVD):
         virtual_disk = self._get_virtual_disk_for(volume, raise_not_found=True)
         self._set_virtual_disk_size(virtual_disk,
                                     self._get_size_in_bytes(new_size))
+        virtual_disk = self._await_virtual_disk_online(virtual_disk.Id)
 
     def delete_volume(self, volume):
         """Deletes a volume.
@@ -322,6 +325,7 @@ class DataCoreVolumeDriver(driver.BaseVD):
             snapshot['display_name'],
             profile_id=profile_id,
             pool_names=pool_names)
+        snapshot_virtual_disk = self._await_virtual_disk_online(snapshot_virtual_disk.Id)
 
         return {'provider_location': snapshot_virtual_disk.Id}
 
@@ -409,6 +413,7 @@ class DataCoreVolumeDriver(driver.BaseVD):
         free_capacity_gb = self._get_size_in_gigabytes(free)
         provisioned_capacity_gb = self._get_size_in_gigabytes(provisioned)
         reserved_percentage = 100.0 * reserved / total if total else 0.0
+        reserved_percentage = math.ceil(reserved_percentage)
         ratio = self.configuration.max_over_subscription_ratio
         stats_data = {
             'vendor_name': 'DataCore',
@@ -423,6 +428,7 @@ class DataCoreVolumeDriver(driver.BaseVD):
             'max_over_subscription_ratio': ratio,
             'thin_provisioning_support': True,
             'thick_provisioning_support': False,
+            'multiattach': True,
         }
         self._stats = stats_data
 
@@ -603,9 +609,20 @@ class DataCoreVolumeDriver(driver.BaseVD):
                             "Suitable disk pools not found.")
                     LOG.error(msg)
                     raise cinder_exception.VolumeDriverException(message=msg)
-
             volume_virtual_disk = self._await_virtual_disk_online(
-                volume_virtual_disk.Id)
+                  volume_virtual_disk.Id)
+            try:
+               source_size = src_obj.volume_size
+            except AttributeError:
+               source_size = source.size
+            if volume.size > source_size:
+                 self._set_virtual_disk_size(volume_virtual_disk,
+                       self._get_size_in_bytes(volume.size))
+                 virtual_disk = datacore_utils.get_first(
+                                lambda disk: disk.Id == volume_virtual_disk.Id,
+                                self._api.get_virtual_disks())
+                 volume_virtual_disk = self._await_virtual_disk_size_change(
+                       volume_virtual_disk.Id, self._get_size_in_bytes(source_size))
 
         except Exception:
             with excutils.save_and_reraise_exception():
@@ -736,3 +753,26 @@ class DataCoreVolumeDriver(driver.BaseVD):
     @staticmethod
     def _get_size_in_gigabytes(size_in_bytes):
         return size_in_bytes / float(units.Gi)
+
+    def _await_virtual_disk_size_change(self, virtual_disk_id, old_size):
+        def inner(start_time):
+            disk_failed_delay = self.configuration.datacore_disk_failed_delay
+            virtual_disk = datacore_utils.get_first(
+                lambda disk: disk.Id == virtual_disk_id,
+                self._api.get_virtual_disks())
+            if virtual_disk.DiskStatus == 'Online' and virtual_disk.Size.Value > old_size:
+                raise loopingcall.LoopingCallDone(virtual_disk)
+            elif (virtual_disk.DiskStatus != 'FailedRedundancy'
+                  and time.time() - start_time >= disk_failed_delay):
+                msg = (_("Virtual disk %(disk)s did not come out of the "
+                         "%(state)s state after %(timeout)s seconds.")
+                       % {'disk': virtual_disk.Id,
+                          'state': virtual_disk.DiskStatus,
+                          'timeout': disk_failed_delay})
+                LOG.error(msg)
+                raise cinder_exception.VolumeDriverException(message=msg)
+
+        inner_loop = loopingcall.FixedIntervalLoopingCall(inner, time.time())
+        time.sleep(self.AWAIT_DISK_ONLINE_INTERVAL)
+        return inner_loop.start(self.AWAIT_DISK_ONLINE_INTERVAL).wait()
+

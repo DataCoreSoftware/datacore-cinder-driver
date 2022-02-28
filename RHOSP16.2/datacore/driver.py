@@ -614,7 +614,7 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
             try:
                source_size = src_obj.volume_size
             except AttributeError:
-               source_size = source.size
+               source_size = src_obj.size
             if volume.size > source_size:
                  self._set_virtual_disk_size(volume_virtual_disk,
                        self._get_size_in_bytes(volume.size))

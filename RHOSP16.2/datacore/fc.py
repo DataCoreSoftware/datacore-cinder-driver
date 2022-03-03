@@ -25,7 +25,6 @@ from cinder.volume.drivers.datacore import exception as datacore_exception
 from cinder.volume.drivers.datacore import utils as datacore_utils
 from oslo_utils import excutils
 
-
 LOG = logging.getLogger(__name__)
 
 
@@ -99,13 +98,13 @@ class FibreChannelVolumeDriver(driver.DataCoreVolumeDriver):
             fc_targets = self._get_targets(virtual_disk, available_ports)
             if not fc_targets:
                 msg = (_("Suitable targets not found for "
-                    "virtual disk %(disk)s for volume %(volume)s.")
-                    % {'disk': virtual_disk.Id, 'volume': volume['id']})
+                         "virtual disk %(disk)s for volume %(volume)s.")
+                       % {'disk': virtual_disk.Id, 'volume': volume['id']})
                 LOG.error(msg)
                 raise cinder_exception.VolumeDriverException(message=msg)
 
             virtual_logical_units = self._map_virtual_disk(
-                    virtual_disk, fc_targets, fc_initiator)
+                virtual_disk, fc_targets, fc_initiator)
             return fc_targets, virtual_logical_units
 
         targets, logical_units = serve_virtual_disk()
@@ -148,12 +147,13 @@ class FibreChannelVolumeDriver(driver.DataCoreVolumeDriver):
             client, available_ports)
 
         fc_initiator = datacore_utils.get_first_or_default(
-            lambda port: True if(port.PortName in connector_wwpns) else False,
+            lambda port: True if (port.PortName in connector_wwpns) else False,
             fc_initiator_ports,
             None)
 
         if not fc_initiator:
-            wwn='-'.join(a + b for a, b in zip(*[iter(connector_wwpns[0].upper())]*2))
+            wwn = '-'.join(
+                a + b for a, b in zip(*[iter(connector_wwpns[0].upper())] * 2))
             scsi_port_data = self._api.build_scsi_port_data(
                 client.Id, wwn, 'Initiator', 'FibreChannel')
             fc_initiator = self._api.register_port(scsi_port_data)
@@ -162,10 +162,9 @@ class FibreChannelVolumeDriver(driver.DataCoreVolumeDriver):
 
     @staticmethod
     def _get_host_fc_initiator_ports(host, ports):
-        return [port for port in ports
-                if port.PortType == 'FibreChannel'
-                and port.PortMode == 'Initiator'
-                and port.HostId == host.Id]
+        return [port for port in ports if
+                port.PortType == 'FibreChannel' and port.PortMode ==
+                'Initiator' and port.HostId == host.Id]
 
     def _get_targets(self, virtual_disk, available_ports):
         fc_target_ports = self._get_frontend_fc_target_ports(
@@ -184,15 +183,16 @@ class FibreChannelVolumeDriver(driver.DataCoreVolumeDriver):
             fc_targets += server_port_map[virtual_disk.SecondHostId]
         return fc_targets
 
-    def _is_fc_frontend_port(self, port):
-        if (port.PortType == 'FibreChannel'
-                and port.PortMode == 'Target'
-                and port.HostId):
-           if (port.PresenceStatus == 'Present'):
-               port_roles = port.ServerPortProperties.Role.split()
-               port_state = (port.StateInfo.State)
-               if 'Frontend' in port_roles and port_state == 'LoopLinkUp':
-                     return True
+    @staticmethod
+    def _is_fc_frontend_port(port):
+        if (port.PortType == 'FibreChannel' and
+                port.PortMode == 'Target' and
+                port.HostId):
+            if port.PresenceStatus == 'Present':
+                port_roles = port.ServerPortProperties.Role.split()
+                port_state = port.StateInfo.State
+                if 'Frontend' in port_roles and port_state == 'LoopLinkUp':
+                    return True
         return False
 
     def _get_frontend_fc_target_ports(self, ports):
@@ -257,30 +257,30 @@ class FibreChannelVolumeDriver(driver.DataCoreVolumeDriver):
 
     def _get_target_domain(self, target, initiator):
         target_domains = self._api.get_target_domains()
-        target_domain = datacore_utils.get_first_or_default(
-            lambda domain: (domain.InitiatorHostId == initiator.HostId
-                            and domain.TargetHostId == target.HostId),
-            target_domains,
-            None)
+        target_domain = datacore_utils.get_first_or_default(lambda domain: (
+                    domain.InitiatorHostId == initiator.HostId and
+                    domain.TargetHostId == target.HostId),
+                                                            target_domains,
+                                                            None)
         return target_domain
 
     def _get_target_device(self, target_domain, target, initiator):
         target_devices = self._api.get_target_devices()
         target_device = datacore_utils.get_first_or_default(
-            lambda device: (device.TargetDomainId == target_domain.Id
-                            and device.InitiatorPortId == initiator.Id
-                            and device.TargetPortId == target.Id),
-            target_devices,
-            None)
+            lambda device: (
+                        device.TargetDomainId == target_domain.Id and
+                        device.InitiatorPortId == initiator.Id and
+                        device.TargetPortId == target.Id),
+            target_devices, None)
         return target_device
 
     def _get_logical_unit(self, logical_disk, target_device):
         logical_units = self._api.get_logical_units()
         logical_unit = datacore_utils.get_first_or_default(
-            lambda unit: (unit.LogicalDiskId == logical_disk.Id
-                          and unit.VirtualTargetDeviceId == target_device.Id),
-            logical_units,
-            None)
+            lambda unit: (
+                        unit.LogicalDiskId == logical_disk.Id and
+                        unit.VirtualTargetDeviceId == target_device.Id),
+            logical_units, None)
         return logical_unit
 
     def _create_logical_unit(self, logical_disk, nexus, target_device):
@@ -296,7 +296,7 @@ class FibreChannelVolumeDriver(driver.DataCoreVolumeDriver):
     def _get_logical_disk_on_host(virtual_disk_id,
                                   host_id, logical_disks):
         logical_disk = datacore_utils.get_first(
-            lambda disk: (disk.ServerHostId == host_id
-                          and disk.VirtualDiskId == virtual_disk_id),
+            lambda disk: (disk.ServerHostId == host_id and
+                          disk.VirtualDiskId == virtual_disk_id),
             logical_disks)
         return logical_disk

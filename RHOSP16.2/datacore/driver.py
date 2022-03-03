@@ -36,7 +36,6 @@ from cinder.volume.drivers.datacore import utils as datacore_utils
 from cinder.volume.drivers.san import san
 from cinder.volume import volume_types
 
-
 LOG = logging.getLogger(__name__)
 
 datacore_opts = [
@@ -325,7 +324,8 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
             snapshot['display_name'],
             profile_id=profile_id,
             pool_names=pool_names)
-        snapshot_virtual_disk = self._await_virtual_disk_online(snapshot_virtual_disk.Id)
+        snapshot_virtual_disk = self._await_virtual_disk_online(
+            snapshot_virtual_disk.Id)
 
         return {'provider_location': snapshot_virtual_disk.Id}
 
@@ -483,9 +483,10 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
 
         available_disk_pools = [
             pool for pool in disk_pools
-            if (self._is_pool_healthy(pool, pool_performance, online_servers)
-                and (not lower_disk_pool_names
-                     or pool.Caption.lower() in lower_disk_pool_names))]
+            if (self._is_pool_healthy(pool, pool_performance,
+                                      online_servers) and (
+                            not lower_disk_pool_names or
+                            pool.Caption.lower() in lower_disk_pool_names))]
 
         available_disk_pools.sort(
             key=lambda p: pool_performance[p.Id].BytesAvailable, reverse=True)
@@ -544,8 +545,9 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
                 self._api.get_virtual_disks())
             if virtual_disk.DiskStatus == 'Online':
                 raise loopingcall.LoopingCallDone(virtual_disk)
-            elif (virtual_disk.DiskStatus != 'FailedRedundancy'
-                  and time.time() - start_time >= disk_failed_delay):
+            elif (
+                    virtual_disk.DiskStatus != 'FailedRedundancy' and
+                    time.time() - start_time >= disk_failed_delay):
                 msg = (_("Virtual disk %(disk)s did not come out of the "
                          "%(state)s state after %(timeout)s seconds.")
                        % {'disk': virtual_disk.Id,
@@ -588,11 +590,10 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
             if disk_type == self.DATACORE_MIRRORED_DISK:
                 pools = self._get_available_disk_pools(pool_names)
                 selected_pool = datacore_utils.get_first_or_default(
-                    lambda pool: (
-                        pool.ServerId != volume_logical_disk.ServerHostId
-                        and pool.Id != volume_logical_disk.PoolId),
-                    pools,
-                    None)
+                    lambda pool: (pool.ServerId !=
+                                  volume_logical_disk.ServerHostId and
+                                  pool.Id != volume_logical_disk.PoolId),
+                    pools, None)
                 if selected_pool:
                     logical_disk = self._api.create_pool_logical_disk(
                         selected_pool.Id,
@@ -610,19 +611,21 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
                     LOG.error(msg)
                     raise cinder_exception.VolumeDriverException(message=msg)
             volume_virtual_disk = self._await_virtual_disk_online(
-                  volume_virtual_disk.Id)
+                volume_virtual_disk.Id)
             try:
-               source_size = src_obj.volume_size
+                source_size = src_obj.volume_size
             except AttributeError:
-               source_size = src_obj.size
+                source_size = src_obj.size
             if volume.size > source_size:
-                 self._set_virtual_disk_size(volume_virtual_disk,
-                       self._get_size_in_bytes(volume.size))
-                 virtual_disk = datacore_utils.get_first(
-                                lambda disk: disk.Id == volume_virtual_disk.Id,
-                                self._api.get_virtual_disks())
-                 volume_virtual_disk = self._await_virtual_disk_size_change(
-                       volume_virtual_disk.Id, self._get_size_in_bytes(source_size))
+                self._set_virtual_disk_size(volume_virtual_disk,
+                                            self._get_size_in_bytes(
+                                                volume.size))
+                virtual_disk = datacore_utils.get_first(
+                    lambda disk: disk.Id == volume_virtual_disk.Id,
+                    self._api.get_virtual_disks())
+                volume_virtual_disk = self._await_virtual_disk_size_change(
+                    volume_virtual_disk.Id,
+                    self._get_size_in_bytes(source_size))
 
         except Exception:
             with excutils.save_and_reraise_exception():
@@ -641,10 +644,10 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
                               src_virtual_disk):
         pools = self._get_available_disk_pools(pool_names)
         destination_pool = datacore_utils.get_first_or_default(
-            lambda pool: (pool.ServerId == src_virtual_disk.FirstHostId
-                          or pool.ServerId == src_virtual_disk.SecondHostId),
-            pools,
-            None)
+            lambda pool: (
+                        pool.ServerId == src_virtual_disk.FirstHostId or
+                        pool.ServerId == src_virtual_disk.SecondHostId),
+            pools, None)
 
         if not destination_pool:
             msg = _("Suitable snapshot destination disk pool not found for "
@@ -672,8 +675,8 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
                 self._api.get_snapshots())
             if snapshot_data.State == 'Migrated':
                 raise loopingcall.LoopingCallDone(snapshot_data)
-            elif (snapshot_data.State != 'Healthy'
-                  and snapshot_data.Failure != 'NoFailure'):
+            elif (snapshot_data.State != 'Healthy' and
+                  snapshot_data.Failure != 'NoFailure'):
                 msg = (_("Full migration of snapshot %(snapshot)s failed. "
                          "Snapshot is in %(state)s state.")
                        % {'snapshot': snapshot_data.Id,
@@ -700,12 +703,12 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
                 try:
                     logical_disk_copy = datacore_utils.get_first(
                         lambda disk: (
-                            disk.Id == snapshot.DestinationLogicalDiskId),
+                                disk.Id == snapshot.DestinationLogicalDiskId),
                         self._api.get_logical_disks())
 
                     virtual_disk_copy = datacore_utils.get_first(
                         lambda disk: (
-                            disk.Id == logical_disk_copy.VirtualDiskId),
+                                disk.Id == logical_disk_copy.VirtualDiskId),
                         self._api.get_virtual_disks())
 
                     self._api.delete_virtual_disk(virtual_disk_copy.Id, True)
@@ -728,7 +731,8 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
         client_hosts = self._api.get_clients()
 
         client = datacore_utils.get_first_or_default(
-            lambda host: host.HostName.split('.')[0] == name.split('.')[0], client_hosts, None)
+            lambda host: host.HostName.split('.')[0] == name.split('.')[0],
+            client_hosts, None)
 
         if create_new:
             if not client:
@@ -740,9 +744,9 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
 
     @staticmethod
     def _is_pool_healthy(pool, pool_performance, online_servers):
-        if (pool.PoolStatus == 'Running'
-                and hasattr(pool_performance[pool.Id], 'BytesAvailable')
-                and pool.ServerId in online_servers):
+        if (pool.PoolStatus == 'Running' and
+                hasattr(pool_performance[pool.Id], 'BytesAvailable') and
+                pool.ServerId in online_servers):
             return True
         return False
 
@@ -760,10 +764,11 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
             virtual_disk = datacore_utils.get_first(
                 lambda disk: disk.Id == virtual_disk_id,
                 self._api.get_virtual_disks())
-            if virtual_disk.DiskStatus == 'Online' and virtual_disk.Size.Value > old_size:
+            if virtual_disk.DiskStatus == 'Online' \
+                    and virtual_disk.Size.Value > old_size:
                 raise loopingcall.LoopingCallDone(virtual_disk)
-            elif (virtual_disk.DiskStatus != 'FailedRedundancy'
-                  and time.time() - start_time >= disk_failed_delay):
+            elif (virtual_disk.DiskStatus != 'FailedRedundancy' and
+                  time.time() - start_time >= disk_failed_delay):
                 msg = (_("Virtual disk %(disk)s did not come out of the "
                          "%(state)s state after %(timeout)s seconds.")
                        % {'disk': virtual_disk.Id,
@@ -775,4 +780,3 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
         inner_loop = loopingcall.FixedIntervalLoopingCall(inner, time.time())
         time.sleep(self.AWAIT_DISK_ONLINE_INTERVAL)
         return inner_loop.start(self.AWAIT_DISK_ONLINE_INTERVAL).wait()
-

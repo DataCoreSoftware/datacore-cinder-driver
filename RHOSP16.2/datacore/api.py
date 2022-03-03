@@ -41,7 +41,6 @@ from cinder.volume.drivers.datacore import utils as datacore_utils
 
 websocket = importutils.try_import('websocket')
 
-
 LOG = logging.getLogger(__name__)
 
 
@@ -187,10 +186,13 @@ class DataCoreClient(object):
         username_token = wsse.UsernameToken(username, password)
         security_options.tokens.append(username_token)
 
-        imp = Import('http://www.w3.org/2001/XMLSchema', location='http://www.w3.org/2001/XMLSchema.xsd')
-        imp.filter.add('http://schemas.microsoft.com/2003/10/Serialization/Arrays')
+        imp = Import('http://www.w3.org/2001/XMLSchema',
+                     location='http://www.w3.org/2001/XMLSchema.xsd')
+        imp.filter.add(
+            'http://schemas.microsoft.com/2003/10/Serialization/Arrays')
         imp.filter.add('http://schemas.microsoft.com/2003/10/Serialization/')
-        imp.filter.add('http://schemas.datacontract.org/2004/07/DataCore.Executive')
+        imp.filter.add(
+            'http://schemas.datacontract.org/2004/07/DataCore.Executive')
 
         self._executive_service_client = suds_client.Client(
             executive_service_endpoint['http_endpoint'] + '?singlewsdl',
@@ -241,20 +243,17 @@ class DataCoreClient(object):
 
     def _get_soap_headers(self, soap_action, message_id):
         headers = [
-            element.Element('Action', ns=self.NS_WSA)
-            .setText(soap_action.replace('"', ''))
-            .append(self.MUST_UNDERSTAND),
+            element.Element('Action', ns=self.NS_WSA).setText(
+                soap_action.replace('"', '')).append(self.MUST_UNDERSTAND),
 
-            element.Element('To', ns=self.NS_WSA)
-            .setText(self.WSA_ANONYMOUS)
-            .append(self.MUST_UNDERSTAND),
+            element.Element('To', ns=self.NS_WSA).setText(
+                self.WSA_ANONYMOUS).append(self.MUST_UNDERSTAND),
 
-            element.Element('MessageID', ns=self.NS_WSA)
-            .setText(message_id),
+            element.Element('MessageID', ns=self.NS_WSA).setText(message_id),
 
-            element.Element('ReplyTo', ns=self.NS_WSA)
-            .insert(element.Element('Address', ns=self.NS_WSA)
-                    .setText(self.WSA_ANONYMOUS)),
+            element.Element('ReplyTo', ns=self.NS_WSA).insert(
+                element.Element('Address', ns=self.NS_WSA).setText(
+                    self.WSA_ANONYMOUS)),
         ]
         return headers
 
@@ -302,7 +301,7 @@ class DataCoreClient(object):
 
         @retrying.retry(
             retry_on_exception=lambda e:
-                isinstance(e, datacore_exceptions.DataCoreConnectionException),
+            isinstance(e, datacore_exceptions.DataCoreConnectionException),
             wait_fixed=self.API_RETRY_INTERVAL * 1000,
             stop_max_delay=self.timeout * 1000)
         def retry_call():
@@ -550,7 +549,7 @@ class DataCoreClient(object):
                                      'Online')
         vd_data.RecoveryPriority = getattr(
             self._storage_services_client.factory
-            .create(self.O_MIRROR_RECOVERY_PRIORITY),
+                .create(self.O_MIRROR_RECOVERY_PRIORITY),
             'Unset')
         vd_data.StorageProfileId = storage_profile_id
 

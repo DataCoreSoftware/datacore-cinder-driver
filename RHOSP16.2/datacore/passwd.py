@@ -24,7 +24,6 @@ from oslo_log import log as logging
 from cinder.i18n import _
 from cinder import utils as cinder_utils
 
-
 LOG = logging.getLogger(__name__)
 
 

@@ -28,7 +28,6 @@ from cinder.volume.drivers.datacore import passwd
 from cinder.volume.drivers.datacore import utils as datacore_utils
 from cinder.volume import volume_utils as volume_utils
 
-
 LOG = logging.getLogger(__name__)
 
 datacore_iscsi_opts = [
@@ -84,8 +83,8 @@ class ISCSIVolumeDriver(driver.DataCoreVolumeDriver):
 
         password_storage_path = getattr(self.configuration,
                                         'datacore_iscsi_chap_storage', None)
-        if (self.configuration.datacore_iscsi_chap_enabled
-                and not password_storage_path):
+        if self.configuration.datacore_iscsi_chap_enabled and not \
+                password_storage_path:
             raise cinder_exception.InvalidInput(
                 _("datacore_iscsi_chap_storage not set."))
         elif password_storage_path:
@@ -136,7 +135,6 @@ class ISCSIVolumeDriver(driver.DataCoreVolumeDriver):
             iscsi_initiator = self._get_initiator(connector['host'],
                                                   connector['initiator'],
                                                   available_ports)
-
             iscsi_targets = self._get_targets(virtual_disk, available_ports)
 
             if not iscsi_targets:
@@ -157,10 +155,10 @@ class ISCSIVolumeDriver(driver.DataCoreVolumeDriver):
         targets, logical_units, chap_params = serve_virtual_disk()
 
         target_portal = datacore_utils.build_network_address(
-            targets[0].PortConfigInfo.PortalsConfig.iScsiPortalConfigInfo[0]
-            .Address.Address,
-            targets[0].PortConfigInfo.PortalsConfig.iScsiPortalConfigInfo[0]
-            .TcpPort)
+            targets[0].PortConfigInfo.PortalsConfig.iScsiPortalConfigInfo[
+                0].Address.Address,
+            targets[0].PortConfigInfo.PortalsConfig.iScsiPortalConfigInfo[
+                0].TcpPort)
 
         connection_data = {}
 
@@ -243,29 +241,26 @@ class ISCSIVolumeDriver(driver.DataCoreVolumeDriver):
     def _get_target_domain(self, target, initiator):
         target_domains = self._api.get_target_domains()
         target_domain = datacore_utils.get_first_or_default(
-            lambda domain: (domain.InitiatorHostId == initiator.HostId
-                            and domain.TargetHostId == target.HostId),
-            target_domains,
-            None)
+            lambda domain: (domain.InitiatorHostId == initiator.HostId and
+                            domain.TargetHostId == target.HostId),
+            target_domains, None)
         return target_domain
 
     def _get_target_device(self, target_domain, target, initiator):
         target_devices = self._api.get_target_devices()
         target_device = datacore_utils.get_first_or_default(
-            lambda device: (device.TargetDomainId == target_domain.Id
-                            and device.InitiatorPortId == initiator.Id
-                            and device.TargetPortId == target.Id),
-            target_devices,
-            None)
+            lambda device: (device.TargetDomainId == target_domain.Id and
+                            device.InitiatorPortId == initiator.Id and
+                            device.TargetPortId == target.Id),
+            target_devices, None)
         return target_device
 
     def _get_logical_unit(self, logical_disk, target_device):
         logical_units = self._api.get_logical_units()
         logical_unit = datacore_utils.get_first_or_default(
-            lambda unit: (unit.LogicalDiskId == logical_disk.Id
-                          and unit.VirtualTargetDeviceId == target_device.Id),
-            logical_units,
-            None)
+            lambda unit: (unit.LogicalDiskId == logical_disk.Id and
+                          unit.VirtualTargetDeviceId == target_device.Id),
+            logical_units, None)
         return logical_unit
 
     def _create_logical_unit(self, logical_disk, nexus, target_device):
@@ -277,7 +272,7 @@ class ISCSIVolumeDriver(driver.DataCoreVolumeDriver):
                                                   'Client')
         return logical_unit
 
-    def _check_iscsi_chap_configuration(self, iscsi_chap_enabled, targets):
+    def _check_iscsi_chap_configuration(self, chap, targets):
         logical_units = self._api.get_logical_units()
         target_devices = self._api.get_target_devices()
 
@@ -292,8 +287,9 @@ class ISCSIVolumeDriver(driver.DataCoreVolumeDriver):
                 targets,
                 None)
             if (target and
-                iscsi_chap_enabled == (target.ServerPortProperties.Authentication == 'None') and
-                iscsi_chap_enabled == (target.ServerPortProperties.Authentication == 'Default')):
+                    chap == (target.ServerPortProperties.Authentication ==
+                             'None') and chap ==
+                    (target.ServerPortProperties.Authentication == 'Default')):
                 msg = _("iSCSI CHAP authentication can't be configured for "
                         "target %s. Device exists that served through "
                         "this target.") % target.PortName
@@ -340,9 +336,9 @@ class ISCSIVolumeDriver(driver.DataCoreVolumeDriver):
                         lambda node: node.Name == initiator.PortName,
                         target_iscsi_nodes,
                         None)
-                    if (not iscsi_node
-                            or not iscsi_node.AccessToken.TargetUsername
-                            or update_access_token):
+                    if not iscsi_node or not \
+                            iscsi_node.AccessToken.TargetUsername or \
+                            update_access_token:
                         self._api.set_access_token(target.Id, access_token)
                 properties = target.ServerPortProperties
                 if properties.Authentication != authentication:
@@ -379,7 +375,6 @@ class ISCSIVolumeDriver(driver.DataCoreVolumeDriver):
             lambda port: port.PortName == iqn,
             iscsi_initiator_ports,
             None)
-
         if not iscsi_initiator:
             scsi_port_data = self._api.build_scsi_port_data(
                 client.Id, iqn, 'Initiator', 'iSCSI')
@@ -409,18 +404,16 @@ class ISCSIVolumeDriver(driver.DataCoreVolumeDriver):
     def _get_logical_disk_on_host(virtual_disk_id,
                                   host_id, logical_disks):
         logical_disk = datacore_utils.get_first(
-            lambda disk: (disk.ServerHostId == host_id
-                          and disk.VirtualDiskId == virtual_disk_id),
+            lambda disk: (disk.ServerHostId == host_id and
+                          disk.VirtualDiskId == virtual_disk_id),
             logical_disks)
         return logical_disk
 
     @staticmethod
     def _is_iscsi_frontend_port(port):
-        if (port.PortType == 'iSCSI'
-                and port.PortMode == 'Target'
-                and port.HostId
-                and port.PresenceStatus == 'Present'
-                and hasattr(port, 'IScsiPortStateInfo')):
+        if (port.PortType == 'iSCSI' and port.PortMode == 'Target' and
+                port.HostId and port.PresenceStatus == 'Present' and
+                hasattr(port, 'IScsiPortStateInfo')):
             port_roles = port.ServerPortProperties.Role.split()
             port_state = (port.IScsiPortStateInfo.PortalsState
                           .PortalStateInfo[0].State)
@@ -435,7 +428,6 @@ class ISCSIVolumeDriver(driver.DataCoreVolumeDriver):
 
     @staticmethod
     def _get_host_iscsi_initiator_ports(host, ports):
-        return [port for port in ports
-                if port.PortType == 'iSCSI'
-                and port.PortMode == 'Initiator'
-                and port.HostId == host.Id]
+        return [port for port in ports if
+                port.PortType == 'iSCSI' and port.PortMode == 'Initiator' and
+                port.HostId == host.Id]

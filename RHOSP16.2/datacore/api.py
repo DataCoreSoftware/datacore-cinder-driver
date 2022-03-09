@@ -15,15 +15,15 @@
 """Classes to invoke DataCore SANsymphony API."""
 
 import copy
+import socket
 import sys
 import uuid
 
 from oslo_log import log as logging
 from oslo_utils import excutils
 from oslo_utils import importutils
-import retrying
+# import retrying
 import six
-import socket
 import suds
 from suds import client as suds_client
 from suds import plugin
@@ -32,7 +32,8 @@ from suds.sax import element
 from suds import wsdl
 from suds import wsse
 from suds import xsd
-from suds.xsd.doctor import Import, ImportDoctor
+from suds.xsd.doctor import Import
+from suds.xsd.doctor import ImportDoctor
 
 from cinder.i18n import _
 from cinder import utils as cinder_utils
@@ -299,11 +300,11 @@ class DataCoreClient(object):
 
     def _invoke_storage_services(self, method, *args, **kwargs):
 
-        @retrying.retry(
-            retry_on_exception=lambda e:
-            isinstance(e, datacore_exceptions.DataCoreConnectionException),
-            wait_fixed=self.API_RETRY_INTERVAL * 1000,
-            stop_max_delay=self.timeout * 1000)
+        @cinder_utils.retry(
+            datacore_exceptions.DataCoreConnectionException,
+            interval=self.API_RETRY_INTERVAL,
+            retries=10,
+            wait_random=True)
         def retry_call():
             storage_services_endpoint = self._get_storage_services_endpoint()
             try:

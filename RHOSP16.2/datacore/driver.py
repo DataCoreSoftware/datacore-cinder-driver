@@ -14,8 +14,8 @@
 
 """Base Driver for DataCore SANsymphony storage array."""
 
-import time
 import math
+import time
 
 from oslo_config import cfg
 from oslo_log import log as logging
@@ -484,9 +484,9 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
         available_disk_pools = [
             pool for pool in disk_pools
             if (self._is_pool_healthy(pool, pool_performance,
-                                      online_servers) and (
-                            not lower_disk_pool_names or
-                            pool.Caption.lower() in lower_disk_pool_names))]
+                                      online_servers) and
+                (not lower_disk_pool_names or
+                 pool.Caption.lower() in lower_disk_pool_names))]
 
         available_disk_pools.sort(
             key=lambda p: pool_performance[p.Id].BytesAvailable, reverse=True)
@@ -562,7 +562,6 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
     def _create_volume_from(self, volume, src_obj):
         src_virtual_disk = self._get_virtual_disk_for(src_obj,
                                                       raise_not_found=True)
-
         if src_virtual_disk.DiskStatus != 'Online':
             LOG.warning("Attempting to create a volume from virtual disk "
                         "%(disk)s that is in %(state)s state.",
@@ -612,15 +611,12 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
                     raise cinder_exception.VolumeDriverException(message=msg)
             volume_virtual_disk = self._await_virtual_disk_online(
                 volume_virtual_disk.Id)
-            try:
-                source_size = src_obj.volume_size
-            except AttributeError:
-                source_size = src_obj.size
-            if volume.size > source_size:
+            source_size = src_obj['size']
+            if volume['size'] > source_size:
                 self._set_virtual_disk_size(volume_virtual_disk,
                                             self._get_size_in_bytes(
                                                 volume.size))
-                virtual_disk = datacore_utils.get_first(
+                volume_virtual_disk = datacore_utils.get_first(
                     lambda disk: disk.Id == volume_virtual_disk.Id,
                     self._api.get_virtual_disks())
                 volume_virtual_disk = self._await_virtual_disk_size_change(
@@ -644,9 +640,8 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
                               src_virtual_disk):
         pools = self._get_available_disk_pools(pool_names)
         destination_pool = datacore_utils.get_first_or_default(
-            lambda pool: (
-                        pool.ServerId == src_virtual_disk.FirstHostId or
-                        pool.ServerId == src_virtual_disk.SecondHostId),
+            lambda pool: (pool.ServerId == src_virtual_disk.FirstHostId or
+                          pool.ServerId == src_virtual_disk.SecondHostId),
             pools, None)
 
         if not destination_pool:
@@ -702,13 +697,13 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
                               "%(snapshot)s.", {'snapshot': snapshot.Id})
                 try:
                     logical_disk_copy = datacore_utils.get_first(
-                        lambda disk: (
-                                disk.Id == snapshot.DestinationLogicalDiskId),
+                        lambda disk: (disk.Id ==
+                                      snapshot.DestinationLogicalDiskId),
                         self._api.get_logical_disks())
 
                     virtual_disk_copy = datacore_utils.get_first(
-                        lambda disk: (
-                                disk.Id == logical_disk_copy.VirtualDiskId),
+                        lambda disk: (disk.Id ==
+                                      logical_disk_copy.VirtualDiskId),
                         self._api.get_virtual_disks())
 
                     self._api.delete_virtual_disk(virtual_disk_copy.Id, True)

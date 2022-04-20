@@ -15,7 +15,6 @@
 """Utilities and helper functions."""
 
 from oslo_utils import netutils
-import six
 
 
 def build_network_address(host, port):
@@ -41,7 +40,7 @@ def get_first(predicate, source):
              specified predicate, if found; otherwise StopIteration is raised
     """
 
-    return six.next(item for item in source if predicate(item))
+    return next(item for item in source if predicate(item))
 
 
 def get_first_or_default(predicate, source, default):

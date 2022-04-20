@@ -22,8 +22,6 @@ import uuid
 from oslo_log import log as logging
 from oslo_utils import excutils
 from oslo_utils import importutils
-# import retrying
-import six
 import suds
 from suds import client as suds_client
 from suds import plugin
@@ -275,21 +273,15 @@ class DataCoreClient(object):
                 header=['soap-content-type: text/xml'])
             channel.send(context.envelope)
             response = channel.recv()
-            if isinstance(response, six.text_type):
+            if isinstance(response, str):
                 response = response.encode('utf-8')
             return context.process_reply(response)
         except (socket.error, websocket.WebSocketException) as e:
-            traceback = sys.exc_info()[2]
             error = datacore_exceptions.DataCoreConnectionException(reason=e)
-            six.reraise(datacore_exceptions.DataCoreConnectionException,
-                        error,
-                        traceback)
+            raise error.with_traceback(sys.exc_info()[2])
         except suds.WebFault as e:
-            traceback = sys.exc_info()[2]
             fault = datacore_exceptions.DataCoreFaultException(reason=e)
-            six.reraise(datacore_exceptions.DataCoreFaultException,
-                        fault,
-                        traceback)
+            raise fault.with_traceback(sys.exc_info()[2])
         finally:
             if channel and channel.connected:
                 try:

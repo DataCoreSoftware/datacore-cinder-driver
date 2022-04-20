@@ -17,7 +17,6 @@
 from unittest import mock
 
 from oslo_utils import units
-import six
 import suds
 from suds.sax import parser
 from suds import wsdl
@@ -710,7 +709,7 @@ class FaultDefinitionsFilterTestCase(test.TestCase):
         context = mock.Mock()
         sax = parser.Parser()
         wsdl_document = FAKE_WSDL_DOCUMENT
-        if isinstance(wsdl_document, six.text_type):
+        if isinstance(wsdl_document, str):
             wsdl_document = wsdl_document.encode('utf-8')
         context.document = sax.parse(string=wsdl_document).root()
         self.assertTrue(self._operation_has_fault(context.document,

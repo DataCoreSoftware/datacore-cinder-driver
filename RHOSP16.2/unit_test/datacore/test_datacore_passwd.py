@@ -15,12 +15,11 @@
 """Unit tests for the password storage."""
 
 import collections
+import io
 import json
 import os
 import stat
 from unittest import mock
-
-import six
 
 from cinder.tests.unit import test
 from cinder.volume.drivers.datacore import passwd
@@ -64,8 +63,8 @@ class PasswordFileStorageTestCase(test.TestCase):
     def test_get_password(self):
         fake_file_storage = FakeFileStorage()
         passwords = fake_file_storage.load()
-        resource = six.next(six.iterkeys(passwords))
-        user, expected = six.next(six.iteritems(passwords[resource]))
+        resource = next(iter(passwords.keys()))
+        user, expected = next(iter(passwords[resource].items()))
 
         self._mock_file_storage(fake_file_storage)
         password_storage = passwd.PasswordFileStorage('fake_file_path')
@@ -103,8 +102,8 @@ class PasswordFileStorageTestCase(test.TestCase):
         fake_file_storage = FakeFileStorage()
         passwords = fake_file_storage.load()
         resource1, resource2 = 'resource1', 'resource2'
-        user1 = six.next(six.iterkeys(passwords[resource1]))
-        user2 = six.next(six.iterkeys(passwords[resource2]))
+        user1, res1 = next(iter(passwords[resource1].items()))
+        user2, res2 = next(iter(passwords[resource2].items()))
 
         self._mock_file_storage(fake_file_storage)
         password_storage = passwd.PasswordFileStorage('fake_file_path')
@@ -280,7 +279,7 @@ class FileStorageTestCase(test.TestCase):
 
     @staticmethod
     def _get_fake_file(content=None):
-        return six.StringIO(content)
+        return io.StringIO(content)
 
     @staticmethod
     def _get_fake_os_stat(st_size):

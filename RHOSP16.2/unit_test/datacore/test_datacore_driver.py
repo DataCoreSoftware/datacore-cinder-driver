@@ -94,19 +94,27 @@ VIRTUAL_DISKS = [
     mock.Mock(Id='virtual_disk_id1',
               DiskStatus='Online',
               IsServed=False,
+              Alias='virtual_disk_id1',
+              Size=mock.Mock(Value=1 * units.Gi),
               FirstHostId='server_id1'),
     mock.Mock(Id='virtual_disk_id2',
               DiskStatus='Failed',
               IsServed=False,
+              Alias='virtual_disk_id2',
+              Size=mock.Mock(Value=1 * units.Gi),
               FirstHostId='server_id2'),
     mock.Mock(Id='virtual_disk_id3',
               DiskStatus='Online',
               IsServed=True,
+              Alias='virtual_disk_id3',
+              Size=mock.Mock(Value=1 * units.Gi),
               FirstHostId='server_id1',
               SecondHostId='server_id2'),
     mock.Mock(Id='virtual_disk_id4',
               DiskStatus='Failed',
               IsServed=False,
+              Alias='virtual_disk_id4',
+              Size=mock.Mock(Value=1 * units.Gi),
               FirstHostId='server_id1',
               SecondHostId='server_id2'),
 ]
@@ -290,7 +298,6 @@ class DataCoreVolumeDriverTestCase(object):
             'volume_backend_name': driver.get_volume_backend_name(),
             'driver_version': driver.get_version(),
             'storage_protocol': driver.get_storage_protocol(),
-            'multiattach': True,
         }
         volume_stats = driver.get_volume_stats(refresh=True)
         self.assertDictEqual(expected_volume_stats, volume_stats)
@@ -704,3 +711,29 @@ class DataCoreVolumeDriverTestCase(object):
         volume = VOLUME.copy()
         volume['provider_location'] = virtual_disk.Id
         driver.terminate_connection(volume, None)
+
+    def test_manage_existing(self):
+        volume = VOLUME.copy()
+        driver = self.init_driver(self.setup_default_configuration())
+        ret = driver.manage_existing(
+            volume, self.test_existing_vol_ref)
+        self.assertEqual("virtual_disk_id1", ret['provider_location'])
+
+    def test_manage_existing_get_size(self):
+        volume = VOLUME.copy()
+        driver = self.init_driver(self.setup_default_configuration())
+        driver.manage_existing_get_size(
+            volume, self.test_existing_vol_ref)
+
+    def test_manage_existing_snapshot(self):
+        snapshot = SNAPSHOT.copy()
+        driver = self.init_driver(self.setup_default_configuration())
+        ret = driver.manage_existing_snapshot(
+            snapshot, self.test_existing_snap_ref)
+        self.assertEqual("virtual_disk_id1", ret['provider_location'])
+
+    def test_manage_existing_snapshot_get_size(self):
+        snapshot = SNAPSHOT.copy()
+        driver = self.init_driver(self.setup_default_configuration())
+        driver.manage_existing_snapshot_get_size(
+            snapshot, self.test_existing_snap_ref)

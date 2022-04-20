@@ -22,7 +22,6 @@ from oslo_log import log as logging
 from oslo_service import loopingcall
 from oslo_utils import excutils
 from oslo_utils import units
-import six
 
 from cinder import context as cinder_context
 from cinder import exception as cinder_exception
@@ -35,6 +34,7 @@ from cinder.volume.drivers.datacore import exception as datacore_exception
 from cinder.volume.drivers.datacore import utils as datacore_utils
 from cinder.volume.drivers.san import san
 from cinder.volume import volume_types
+from cinder.volume import volume_utils
 
 LOG = logging.getLogger(__name__)
 
@@ -268,6 +268,9 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
         """
 
         virtual_disk = self._get_virtual_disk_for(volume, raise_not_found=True)
+        LOG.error("extend_volume start")
+        LOG.error(virtual_disk)
+        LOG.error("extend_volume end")
         self._set_virtual_disk_size(virtual_disk,
                                     self._get_size_in_bytes(new_size))
         virtual_disk = self._await_virtual_disk_online(virtual_disk.Id)
@@ -374,6 +377,74 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
             for client in clients:
                 unserve_virtual_disk(client.Id)
 
+    def manage_existing(self, volume, existing_ref):
+        return self.manage_existing_object(volume, existing_ref, "volume")
+
+    def manage_existing_get_size(self, volume, existing_ref):
+        return self.manage_existing_object_get_size(volume, existing_ref,
+                                                    "volume")
+
+    def manage_existing_snapshot(self, snapshot, existing_ref):
+        return self.manage_existing_object(snapshot, existing_ref, "snapshot")
+
+    def manage_existing_snapshot_get_size(self, snapshot, existing_ref):
+        return self.manage_existing_object_get_size(snapshot, existing_ref,
+                                                    "snapshot")
+
+    def manage_existing_object(self, existing_object, existing_ref,
+                               object_type):
+        if 'source-name' not in existing_ref:
+            reason = _('Reference must contain source-name element.')
+            raise cinder_exception.ManageExistingInvalidReference(
+                existing_ref=existing_ref, reason=reason)
+        if object_type == "volume":
+            vd_alias = volume_utils.extract_id_from_volume_name(
+                existing_ref['source-name'])
+        else:
+            snapshot_name = self._unescape_snapshot(
+                existing_ref['source-name'])
+            vd_alias = volume_utils.extract_id_from_snapshot_name(
+                snapshot_name)
+
+        virtual_disk = datacore_utils.get_first_or_default(
+            lambda disk: disk.Alias == vd_alias,
+            self._api.get_virtual_disks(),
+            None)
+
+        if not virtual_disk:
+            kwargs = {'existing_ref': vd_alias,
+                      'reason': 'Specified Virtual disk does not exist.'}
+            raise cinder_exception.ManageExistingInvalidReference(**kwargs)
+
+        return {'provider_location': virtual_disk.Id}
+
+    def manage_existing_object_get_size(self, existing_object, existing_ref,
+                                        object_type):
+        if 'source-name' not in existing_ref:
+            reason = _('Reference must contain source-name element.')
+            raise cinder_exception.ManageExistingInvalidReference(
+                existing_ref=existing_ref, reason=reason)
+
+        if object_type == "volume":
+            vd_alias = volume_utils.extract_id_from_volume_name(
+                existing_ref['source-name'])
+        else:
+            snapshot_name = self._unescape_snapshot(
+                existing_ref['source-name'])
+            vd_alias = volume_utils.extract_id_from_snapshot_name(
+                snapshot_name)
+
+        virtual_disk = datacore_utils.get_first_or_default(
+            lambda disk: disk.Alias == vd_alias,
+            self._api.get_virtual_disks(),
+            None)
+
+        if not virtual_disk:
+            kwargs = {'existing_ref': vd_alias,
+                      'reason': 'Specified Virtual disk does not exist.'}
+            raise cinder_exception.ManageExistingInvalidReference(**kwargs)
+        return(self._get_size_in_gigabytes(virtual_disk.Size.Value))
+
     def _update_volume_stats(self):
         performance_data = self._api.get_performance_by_type(
             ['DiskPoolPerformance'])
@@ -428,7 +499,6 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
             'max_over_subscription_ratio': ratio,
             'thin_provisioning_support': True,
             'thick_provisioning_support': False,
-            'multiattach': True,
         }
         self._stats = stats_data
 
@@ -445,7 +515,7 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
             volume_type = volume_types.get_volume_type(admin_context, type_id)
             specs = dict(volume_type).get('extra_specs')
 
-            for key, value in six.iteritems(specs):
+            for key, value in specs.items():
                 if key in self.VALID_VOLUME_TYPE_KEYS:
                     if key == self.DATACORE_DISK_POOLS_KEY:
                         options[key] = [v.strip().lower()
@@ -611,8 +681,14 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
                     raise cinder_exception.VolumeDriverException(message=msg)
             volume_virtual_disk = self._await_virtual_disk_online(
                 volume_virtual_disk.Id)
-            source_size = src_obj['size']
+            try:
+                source_size = src_obj['size']
+            except AttributeError:
+                source_size = src_obj['volume_size']
             if volume['size'] > source_size:
+                LOG.error("_create_volume_from start new")
+                LOG.error(volume_virtual_disk)
+                LOG.error("_create_volume_from end")
                 self._set_virtual_disk_size(volume_virtual_disk,
                                             self._get_size_in_bytes(
                                                 volume.size))
@@ -680,6 +756,7 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
                 raise cinder_exception.VolumeDriverException(message=msg)
 
         loop = loopingcall.FixedIntervalLoopingCall(inner)
+        time.sleep(self.AWAIT_SNAPSHOT_ONLINE_INTERVAL)
         return loop.start(self.AWAIT_SNAPSHOT_ONLINE_INTERVAL,
                           self.AWAIT_SNAPSHOT_ONLINE_INITIAL_DELAY).wait()
 
@@ -691,6 +768,7 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
         try:
             snapshot = self._await_snapshot_migrated(snapshot.Id)
             self._api.delete_snapshot(snapshot.Id)
+            self._await_snapshot_split_state_change(snapshot)
         except Exception:
             with excutils.save_and_reraise_exception():
                 LOG.exception("Split operation failed for snapshot "
@@ -775,3 +853,33 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
         inner_loop = loopingcall.FixedIntervalLoopingCall(inner, time.time())
         time.sleep(self.AWAIT_DISK_ONLINE_INTERVAL)
         return inner_loop.start(self.AWAIT_DISK_ONLINE_INTERVAL).wait()
+
+    def _await_snapshot_split_state_change(self, split_snapshot):
+        def inner(start_time):
+            disk_failed_delay = self.configuration.datacore_disk_failed_delay
+            snapshot_found = False
+            snapshot_list = self._api.get_snapshots()
+            if not snapshot_list:
+                raise loopingcall.LoopingCallDone()
+            for entry in snapshot_list:
+                if entry.Caption == split_snapshot.Caption:
+                    snapshot_found = True
+                    break
+            if not snapshot_found:
+                raise loopingcall.LoopingCallDone()
+            if (time.time() - start_time >= disk_failed_delay):
+                msg = (_("Split Snapshot disk %(disk)s did not happened "
+                         "after %(timeout)s seconds.")
+                       % {'disk': split_snapshot.Caption,
+                          'timeout': disk_failed_delay})
+                LOG.error(msg)
+                raise loopingcall.LoopingCallDone()
+
+        inner_loop = loopingcall.FixedIntervalLoopingCall(inner, time.time())
+        return inner_loop.start(self.AWAIT_DISK_ONLINE_INTERVAL).wait()
+
+    def _unescape_snapshot(self, snapshot_name):
+        # Undo snapshot name change done by _escape_snapshot()
+        if not snapshot_name.startswith('_snapshot'):
+            return snapshot_name
+        return snapshot_name[1:]

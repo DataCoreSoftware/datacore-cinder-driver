@@ -33,12 +33,12 @@ datacore_fc_opts = [
                 default=[],
                 help='List of FC targets that cannot be used to attach '
                      'volume. To prevent the DataCore FibreChannel '
-                     ' volume driver from using some front-end targets '
-                     ' in volume attachment, specify this option and list '
-                     ' the iqn and target machine for each target as '
-                     ' the value, such as '
-                     ' <wwpns:target name>, <wwpns:target name>, '
-                     ' <wwpns:target name>.'),
+                     'volume driver from using some front-end targets '
+                     'in volume attachment, specify this option and list '
+                     'the iqn and target machine for each target as '
+                     'the value, such as '
+                     '<wwpns:target name>, <wwpns:target name>, '
+                     '<wwpns:target name>.'),
 ]
 
 CONF = cfg.CONF
@@ -150,20 +150,6 @@ class FibreChannelVolumeDriver(driver.DataCoreVolumeDriver):
             'data': connection_data,
         }
 
-    def _get_online_ports(self, online_servers):
-        ports = self._api.get_ports()
-        online_ports = {port.Id: port for port in ports
-                        if port.HostId in online_servers}
-
-        return online_ports
-
-    def _get_online_devices(self, online_ports):
-        devices = self._api.get_target_devices()
-        online_devices = {device.Id: device for device in devices
-                          if device.TargetPortId in online_ports}
-
-        return online_devices
-
     def _get_initiator(self, host, connector_wwpns, available_ports):
         wwpn_list = []
         for wwp in connector_wwpns:
@@ -183,12 +169,16 @@ class FibreChannelVolumeDriver(driver.DataCoreVolumeDriver):
             None)
 
         if not fc_initiator:
-            wwn = '-'.join(
-                a + b for a, b in zip(*[iter(connector_wwpns[0].upper())] * 2))
-            scsi_port_data = self._api.build_scsi_port_data(
-                client.Id, wwn, 'Initiator', 'FibreChannel')
-            fc_initiator = self._api.register_port(scsi_port_data)
-
+            for wwn in wwpn_list:
+                for port in available_ports:
+                    if (port.PortName == wwn and
+                            port.PortType == 'FibreChannel' and
+                            port.PortMode == 'Initiator' and
+                            port.Connected):
+                        scsi_port_data = self._api.build_scsi_port_data(
+                            client.Id, wwn, 'Initiator', 'FibreChannel')
+                        fc_initiator = self._api.register_port(scsi_port_data)
+                        return fc_initiator
         return fc_initiator
 
     @staticmethod

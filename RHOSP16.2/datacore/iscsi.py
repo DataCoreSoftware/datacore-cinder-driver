@@ -336,9 +336,9 @@ class ISCSIVolumeDriver(driver.DataCoreVolumeDriver):
                         lambda node: node.Name == initiator.PortName,
                         target_iscsi_nodes,
                         None)
-                    if not iscsi_node or not \
-                            iscsi_node.AccessToken.TargetUsername or \
-                            update_access_token:
+                    if ((not iscsi_node) or not
+                            (iscsi_node.AccessToken.TargetUsername) or
+                            (update_access_token)):
                         self._api.set_access_token(target.Id, access_token)
                 properties = target.ServerPortProperties
                 if properties.Authentication != authentication:

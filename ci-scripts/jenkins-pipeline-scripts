@@ -1,0 +1,17 @@
+
+currentBuild.displayName = "ci-result-"+currentBuild.startTimeInMillis
+pipeline {
+    agent {label 'cinder-ci-test'}
+    options { timestamps () }
+    stages {
+        stage('Test') {
+            steps {
+                script {
+                   def now = new Date()
+                   dir_name=now.format("yy-MM-dd-HH-mm-ss")
+                   sh "/opt/upstream/pipeline/run-tempest.sh $BUILD_DISPLAY_NAME"
+                }
+            }
+        }
+    }
+}

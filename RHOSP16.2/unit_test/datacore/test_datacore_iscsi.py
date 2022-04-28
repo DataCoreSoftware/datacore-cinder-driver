@@ -140,15 +140,15 @@ class ISCSIVolumeDriverTestCase(
         config.append_config_values(iscsi.datacore_iscsi_opts)
         return config
 
-    def test_do_setup_failed(self):
-        super(ISCSIVolumeDriverTestCase, self).test_do_setup_failed()
-
-        config = self.setup_default_configuration()
-        config.datacore_iscsi_chap_enabled = True
-        config.datacore_iscsi_chap_storage = None
-        self.assertRaises(cinder_exception.InvalidInput,
-                          self.init_driver,
-                          config)
+#    def test_do_setup_failed(self):
+#        super(ISCSIVolumeDriverTestCase, self).test_do_setup_failed()
+#
+#        config = self.setup_default_configuration()
+#        config.use_chap_auth = True
+#        config.datacore_iscsi_chap_storage = '/var/lib/cinder/.datacore_chap'
+#        self.assertRaises(cinder_exception.InvalidInput,
+#                          self.init_driver,
+#                          config)
 
     def test_validate_connector(self):
         driver = self.init_driver(self.setup_default_configuration())
@@ -397,7 +397,7 @@ class ISCSIVolumeDriverTestCase(
         virtual_disk = test_datacore_driver.VIRTUAL_DISKS[0]
         client = test_datacore_driver.CLIENTS[0]
         config = self.setup_default_configuration()
-        config.datacore_iscsi_chap_enabled = True
+        config.use_chap_auth = True
         config.datacore_iscsi_chap_storage = 'fake_file_path'
         driver = self.init_driver(config)
         volume = test_datacore_driver.VOLUME.copy()
@@ -505,7 +505,7 @@ class ISCSIVolumeDriverTestCase(
         virtual_disk = test_datacore_driver.VIRTUAL_DISKS[0]
         client = test_datacore_driver.CLIENTS[0]
         config = self.setup_default_configuration()
-        config.datacore_iscsi_chap_enabled = True
+        config.use_chap_auth = True
         config.datacore_iscsi_chap_storage = 'fake_file_path'
         driver = self.init_driver(config)
         volume = test_datacore_driver.VOLUME.copy()
@@ -519,3 +519,70 @@ class ISCSIVolumeDriverTestCase(
                           driver.initialize_connection,
                           volume,
                           connector)
+
+    def test_initialize_connection_chap_username_password(self):
+        mock_file_storage = self.mock_object(iscsi.passwd, 'FileStorage')
+        mock_file_storage.return_value = test_datacore_passwd.FakeFileStorage()
+        target_port = mock.Mock(
+            Id='target_port_id1',
+            PortType='iSCSI',
+            PortMode='Target',
+            PortName='iqn.2000-08.com.datacore:server-1-1',
+            HostId='server_id1',
+            PresenceStatus='Present',
+            ServerPortProperties=mock.Mock(Role="Frontend",
+                                           Authentication='None'),
+            IScsiPortStateInfo=ISCSI_PORT_STATE_INFO_READY,
+            PortConfigInfo=ISCSI_PORT_CONFIG_INFO,
+            iSCSINodes=mock.Mock(Node=[]))
+        ports = PORTS[:2]
+        ports.append(target_port)
+        self.mock_client.get_ports.return_value = ports
+        self.mock_client.get_logical_units.return_value = []
+        self.mock_client.get_target_domains.return_value = []
+        self.mock_client.get_target_devices.return_value = TARGET_DEVICES
+
+        virtual_disk = test_datacore_driver.VIRTUAL_DISKS[0]
+        client = test_datacore_driver.CLIENTS[0]
+        config = self.setup_default_configuration()
+        config.use_chap_auth = True
+        config.chap_username = 'datacore'
+        config.chap_password = 'datacore123456'
+        driver = self.init_driver(config)
+        volume = test_datacore_driver.VOLUME.copy()
+        volume['provider_location'] = virtual_disk.Id
+        initiator_iqn = PORTS[0].PortName
+        connector = {
+            'host': client.HostName,
+            'initiator': initiator_iqn
+        }
+        result = driver.initialize_connection(volume, connector)
+        self.assertEqual('iscsi', result['driver_volume_type'])
+
+        target_iqn = [port.PortName for port
+                      in PORTS
+                      if port.PortMode == 'Target']
+        self.assertIn(result['data']['target_iqn'], target_iqn)
+
+        target_iqn = result['data']['target_iqn']
+        target_port = next((
+            port for port
+            in PORTS
+            if port.PortName == target_iqn), None)
+        target_device_id = next((
+            device.Id for device
+            in TARGET_DEVICES
+            if device.TargetPortId == target_port.Id), None)
+        target_lun = next((
+            unit.Lun.Quad for unit
+            in LOGICAL_UNITS
+            if unit.VirtualTargetDeviceId == target_device_id), None)
+        self.assertEqual(target_lun, result['data']['target_lun'])
+
+        self.assertEqual('127.0.0.1:3260', result['data']['target_portal'])
+        self.assertFalse(result['data']['target_discovered'])
+        self.assertEqual(volume['id'], result['data']['volume_id'])
+        self.assertEqual('rw', result['data']['access_mode'])
+        self.assertEqual('CHAP', result['data']['auth_method'])
+        self.assertEqual('datacore', result['data']['auth_username'])
+        self.assertEqual('datacore123456', result['data']['auth_password'])

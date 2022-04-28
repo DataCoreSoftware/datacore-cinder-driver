@@ -13,6 +13,9 @@ failed_run=0
 #concurrency="--concurrency 38"
 #tests="tempest.api.compute.|tempest.api.volume.|tempest.scenario.|tempest.api.image."
 tests="tempest.api.volume."
+GERRIT_CHANGE_NUMBER="$2"
+GERRIT_PATCHSET_NUMBER="$3"
+GERRIT_REFSPEC="$4"
 
 
 if [ $script_dir == "." ]; then
@@ -132,6 +135,16 @@ detach_disk() {
 	       	sudo detach_disk.sh $i >> /dev/null 2>&1
 	done
 }
+
+update_cinder () {
+	cd $script_dir
+	./checkout-patchset.sh "$GERRIT_CHANGE_NUMBER $GERRIT_PATCHSET_NUMBER $GERRIT_REFSPEC"
+	error_check $? "checkout patchset"
+}
+
+echo "Updating cinder code"
+update_cinder
+
 echo "Clearing logs"
 sudo journalctl  --unit  devstack@c-vol.service  --vacuum-time=1s >> /dev/null 2>&1
 

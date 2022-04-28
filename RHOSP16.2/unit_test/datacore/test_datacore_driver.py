@@ -119,6 +119,17 @@ VIRTUAL_DISKS = [
               SecondHostId='server_id2'),
 ]
 
+
+EXT_VIRTUAL_DISKS = [
+    mock.Mock(Id='virtual_disk_id1',
+              DiskStatus='Online',
+              IsServed=False,
+              Alias='virtual_disk_id1',
+              Size=mock.Mock(Value=2 * units.Gi),
+              FirstHostId='server_id1'),
+]
+
+
 VIRTUAL_DISK_SNAPSHOTS = [
     mock.Mock(Id='snapshot_id1',
               State='Migrated',
@@ -194,6 +205,14 @@ VOLUME = {
     'volume_type_id': None,
     'size': 1,
 }
+
+EXT_VOLUME = {
+    'id': fake_constants.VOLUME_ID,
+    'display_name': 'volume_1',
+    'volume_type_id': None,
+    'size': 2,
+}
+
 
 SNAPSHOT = {
     'id': fake_constants.SNAPSHOT_ID,
@@ -474,7 +493,7 @@ class DataCoreVolumeDriverTestCase(object):
         driver = self.init_driver(self.setup_default_configuration())
         volume = VOLUME.copy()
         volume['provider_location'] = virtual_disk.Id
-        driver.extend_volume(volume, 2147483648)
+        self.assertIsNone(driver.extend_volume(volume, 2147483648))
 
     def test_extend_volume_failed_not_found(self):
         driver = self.init_driver(self.setup_default_configuration())
@@ -737,3 +756,16 @@ class DataCoreVolumeDriverTestCase(object):
         driver = self.init_driver(self.setup_default_configuration())
         driver.manage_existing_snapshot_get_size(
             snapshot, self.test_existing_snap_ref)
+
+    def test_create_extended_cloned_volume(self):
+        virtual_disk = EXT_VIRTUAL_DISKS[0]
+        self.mock_client.get_virtual_disks.return_value = EXT_VIRTUAL_DISKS
+        virtual_disk_snapshot = VIRTUAL_DISK_SNAPSHOTS[0]
+        self.mock_client.create_snapshot.return_value = virtual_disk_snapshot
+
+        driver = self.init_driver(self.setup_default_configuration())
+        volume = EXT_VOLUME.copy()
+        src_vref = VOLUME.copy()
+        src_vref['provider_location'] = virtual_disk.Id
+        result = driver.create_cloned_volume(volume, src_vref)
+        self.assertIn('provider_location', result)

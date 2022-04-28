@@ -133,6 +133,10 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
             self.DATACORE_DISK_POOLS_KEY: disk_pools,
         }
 
+    @staticmethod
+    def get_driver_options():
+        return datacore_opts
+
     def check_for_setup_error(self):
         pass
 
@@ -691,7 +695,7 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
                 LOG.error("_create_volume_from end")
                 self._set_virtual_disk_size(volume_virtual_disk,
                                             self._get_size_in_bytes(
-                                                volume.size))
+                                                volume['size']))
                 volume_virtual_disk = datacore_utils.get_first(
                     lambda disk: disk.Id == volume_virtual_disk.Id,
                     self._api.get_virtual_disks())
@@ -879,7 +883,6 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
         return inner_loop.start(self.AWAIT_DISK_ONLINE_INTERVAL).wait()
 
     def _unescape_snapshot(self, snapshot_name):
-        # Undo snapshot name change done by _escape_snapshot()
         if not snapshot_name.startswith('_snapshot'):
             return snapshot_name
         return snapshot_name[1:]

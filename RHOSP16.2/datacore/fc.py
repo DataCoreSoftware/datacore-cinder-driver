@@ -22,6 +22,7 @@ from cinder import exception as cinder_exception
 from cinder.i18n import _
 from cinder import interface
 from cinder import utils as cinder_utils
+from cinder.volume import configuration
 from cinder.volume.drivers.datacore import driver
 from cinder.volume.drivers.datacore import exception as datacore_exception
 from cinder.volume.drivers.datacore import utils as datacore_utils
@@ -42,7 +43,7 @@ datacore_fc_opts = [
 ]
 
 CONF = cfg.CONF
-CONF.register_opts(datacore_fc_opts)
+CONF.register_opts(datacore_fc_opts, group=configuration.SHARED_CONF_GROUP)
 
 
 @interface.volumedriver
@@ -63,7 +64,13 @@ class FibreChannelVolumeDriver(driver.DataCoreVolumeDriver):
 
     def __init__(self, *args, **kwargs):
         super(FibreChannelVolumeDriver, self).__init__(*args, **kwargs)
-        self.configuration.append_config_values(datacore_fc_opts)
+        self.configuration = kwargs.get('configuration', None)
+        if self.configuration:
+            self.configuration.append_config_values(datacore_fc_opts)
+
+    @staticmethod
+    def get_driver_options():
+        return datacore_fc_opts
 
     def validate_connector(self, connector):
         """Fail if connector doesn't contain all the data needed by the driver.

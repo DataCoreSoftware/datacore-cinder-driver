@@ -22,6 +22,7 @@ from cinder import exception as cinder_exception
 from cinder.i18n import _
 from cinder import interface
 from cinder import utils as cinder_utils
+from cinder.volume import configuration
 from cinder.volume.drivers.datacore import driver
 from cinder.volume.drivers.datacore import exception as datacore_exception
 from cinder.volume.drivers.datacore import passwd
@@ -40,16 +41,15 @@ datacore_iscsi_opts = [
                      'for each target as the value, such as '
                      '<iqn:target name>, <iqn:target name>, '
                      '<iqn:target name>.'),
-    cfg.BoolOpt('datacore_iscsi_chap_enabled',
-                default=False,
-                help='Configure CHAP authentication for iSCSI connections.'),
     cfg.StrOpt('datacore_iscsi_chap_storage',
-               default=None,
-               help='iSCSI CHAP authentication password storage file.'),
+               default='$state_path/.datacore_chap',
+               help='Fully qualified file name where dynamically generated '
+                    'iSCSI CHAP secrets are stored. '
+                    'Default=$state_path/.datacore_chap'),
 ]
 
 CONF = cfg.CONF
-CONF.register_opts(datacore_iscsi_opts)
+CONF.register_opts(datacore_iscsi_opts, group=configuration.SHARED_CONF_GROUP)
 
 
 @interface.volumedriver
@@ -70,8 +70,14 @@ class ISCSIVolumeDriver(driver.DataCoreVolumeDriver):
 
     def __init__(self, *args, **kwargs):
         super(ISCSIVolumeDriver, self).__init__(*args, **kwargs)
-        self.configuration.append_config_values(datacore_iscsi_opts)
+        self.configuration = kwargs.get('configuration', None)
+        if self.configuration:
+            self.configuration.append_config_values(datacore_iscsi_opts)
         self._password_storage = None
+
+    @staticmethod
+    def get_driver_options():
+        return datacore_iscsi_opts
 
     def do_setup(self, context):
         """Perform validations and establish connection to server.
@@ -83,13 +89,8 @@ class ISCSIVolumeDriver(driver.DataCoreVolumeDriver):
 
         password_storage_path = getattr(self.configuration,
                                         'datacore_iscsi_chap_storage', None)
-        if self.configuration.datacore_iscsi_chap_enabled and not \
-                password_storage_path:
-            raise cinder_exception.InvalidInput(
-                _("datacore_iscsi_chap_storage not set."))
-        elif password_storage_path:
-            self._password_storage = passwd.PasswordFileStorage(
-                self.configuration.datacore_iscsi_chap_storage)
+        self._password_storage = passwd.PasswordFileStorage(
+            password_storage_path)
 
     def validate_connector(self, connector):
         """Fail if connector doesn't contain all the data needed by the driver.
@@ -297,7 +298,7 @@ class ISCSIVolumeDriver(driver.DataCoreVolumeDriver):
                 raise cinder_exception.VolumeDriverException(message=msg)
 
     def _setup_iscsi_chap_authentication(self, targets, initiator):
-        iscsi_chap_enabled = self.configuration.datacore_iscsi_chap_enabled
+        iscsi_chap_enabled = self.configuration.use_chap_auth
 
         self._check_iscsi_chap_configuration(iscsi_chap_enabled, targets)
 
@@ -305,11 +306,15 @@ class ISCSIVolumeDriver(driver.DataCoreVolumeDriver):
         update_access_token = False
         access_token = None
         chap_secret = None
+        chap_username = initiator.PortName
         if iscsi_chap_enabled:
             authentication = 'CHAP'
-            chap_secret = self._password_storage.get_password(
-                server_group.Id, initiator.PortName)
-            update_access_token = False
+            chap_username = self.configuration.chap_username
+            if not chap_username:
+                chap_username = initiator.PortName
+            chap_secret = (self.configuration.chap_password or
+                           self._password_storage.get_password(
+                               server_group.Id, initiator.PortName))
             if not chap_secret:
                 chap_secret = volume_utils.generate_password(length=15)
                 self._password_storage.set_password(
@@ -320,13 +325,17 @@ class ISCSIVolumeDriver(driver.DataCoreVolumeDriver):
                 None,
                 None,
                 False,
-                initiator.PortName,
+                chap_username,
                 chap_secret)
         else:
             authentication = 'None'
             if self._password_storage:
-                self._password_storage.delete_password(server_group.Id,
-                                                       initiator.PortName)
+                try:
+                    self._password_storage.delete_password(server_group.Id,
+                                                           initiator.PortName)
+                except Exception:
+                    pass
+
         changed_targets = {}
         try:
             for target in targets:
@@ -363,7 +372,7 @@ class ISCSIVolumeDriver(driver.DataCoreVolumeDriver):
                                 "on initiator %(initiator)s: %(error)s.",
                                 {'initiator': initiator.PortName, 'error': e})
         if iscsi_chap_enabled:
-            return initiator.PortName, chap_secret
+            return chap_username, chap_secret
 
     def _get_initiator(self, host, iqn, available_ports):
         client = self._get_client(host, create_new=True)

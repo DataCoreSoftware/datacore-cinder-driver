@@ -44,8 +44,7 @@ datacore_iscsi_opts = [
     cfg.StrOpt('datacore_iscsi_chap_storage',
                default='$state_path/.datacore_chap',
                help='Fully qualified file name where dynamically generated '
-                    'iSCSI CHAP secrets are stored. '
-                    'Default=$state_path/.datacore_chap'),
+                    'iSCSI CHAP secrets are stored.'),
 ]
 
 CONF = cfg.CONF
@@ -75,9 +74,11 @@ class ISCSIVolumeDriver(driver.DataCoreVolumeDriver):
             self.configuration.append_config_values(datacore_iscsi_opts)
         self._password_storage = None
 
-    @staticmethod
-    def get_driver_options():
-        return datacore_iscsi_opts
+    @classmethod
+    def get_driver_options(cls):
+        additional_opts = cls._get_oslo_driver_opts(
+            'san_ip', 'san_login', 'san_password')
+        return driver.datacore_opts + datacore_iscsi_opts + additional_opts
 
     def do_setup(self, context):
         """Perform validations and establish connection to server.
@@ -87,10 +88,8 @@ class ISCSIVolumeDriver(driver.DataCoreVolumeDriver):
 
         super(ISCSIVolumeDriver, self).do_setup(context)
 
-        password_storage_path = getattr(self.configuration,
-                                        'datacore_iscsi_chap_storage', None)
         self._password_storage = passwd.PasswordFileStorage(
-            password_storage_path)
+            self.configuration.datacore_iscsi_chap_storage)
 
     def validate_connector(self, connector):
         """Fail if connector doesn't contain all the data needed by the driver.

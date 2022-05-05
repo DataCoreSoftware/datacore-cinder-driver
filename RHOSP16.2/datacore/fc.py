@@ -68,9 +68,11 @@ class FibreChannelVolumeDriver(driver.DataCoreVolumeDriver):
         if self.configuration:
             self.configuration.append_config_values(datacore_fc_opts)
 
-    @staticmethod
-    def get_driver_options():
-        return datacore_fc_opts
+    @classmethod
+    def get_driver_options(cls):
+        additional_opts = cls._get_oslo_driver_opts(
+            'san_ip', 'san_login', 'san_password')
+        return driver.datacore_opts + datacore_fc_opts + additional_opts
 
     def validate_connector(self, connector):
         """Fail if connector doesn't contain all the data needed by the driver.

@@ -226,7 +226,6 @@ class DataCoreVolumeDriverTestCase(object):
 
     def setUp(self):
         super(DataCoreVolumeDriverTestCase, self).setUp()
-        self.override_config('datacore_disk_failed_delay', 0)
         self.mock_client = mock.Mock()
         self.mock_client.get_servers.return_value = SERVERS
         self.mock_client.get_disk_pools.return_value = DISK_POOLS
@@ -261,6 +260,7 @@ class DataCoreVolumeDriverTestCase(object):
         config.san_login = 'dcsadmin'
         config.san_password = 'password'
         config.datacore_api_timeout = 0
+        config.datacore_disk_failed_delay = 0
         return config
 
     def test_do_setup(self):
@@ -735,27 +735,27 @@ class DataCoreVolumeDriverTestCase(object):
         volume = VOLUME.copy()
         driver = self.init_driver(self.setup_default_configuration())
         ret = driver.manage_existing(
-            volume, self.test_existing_vol_ref)
+            volume, self.existing_ref)
         self.assertEqual("virtual_disk_id1", ret['provider_location'])
 
     def test_manage_existing_get_size(self):
         volume = VOLUME.copy()
         driver = self.init_driver(self.setup_default_configuration())
         driver.manage_existing_get_size(
-            volume, self.test_existing_vol_ref)
+            volume, self.existing_ref)
 
     def test_manage_existing_snapshot(self):
         snapshot = SNAPSHOT.copy()
         driver = self.init_driver(self.setup_default_configuration())
         ret = driver.manage_existing_snapshot(
-            snapshot, self.test_existing_snap_ref)
+            snapshot, self.existing_ref)
         self.assertEqual("virtual_disk_id1", ret['provider_location'])
 
     def test_manage_existing_snapshot_get_size(self):
         snapshot = SNAPSHOT.copy()
         driver = self.init_driver(self.setup_default_configuration())
         driver.manage_existing_snapshot_get_size(
-            snapshot, self.test_existing_snap_ref)
+            snapshot, self.existing_ref)
 
     def test_create_extended_cloned_volume(self):
         virtual_disk = EXT_VIRTUAL_DISKS[0]

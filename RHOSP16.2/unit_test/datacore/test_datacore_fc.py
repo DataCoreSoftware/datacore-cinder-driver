@@ -85,10 +85,8 @@ class FibreChannelVolumeDriverTestCase(
         test_datacore_driver.DataCoreVolumeDriverTestCase, test.TestCase):
     """Tests for the FC Driver for DataCore SANsymphony storage array."""
 
-    test_existing_vol_ref = {
-        'source-name': 'volume-virtual_disk_id1'}
-    test_existing_snap_ref = {
-        'source-name': '_snapshot-virtual_disk_id1'}
+    existing_ref = {
+        'source-name': 'virtual_disk_id1'}
 
     def setUp(self):
         super(FibreChannelVolumeDriverTestCase, self).setUp()

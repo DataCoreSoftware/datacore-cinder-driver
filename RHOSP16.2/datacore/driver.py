@@ -28,13 +28,13 @@ from cinder import exception as cinder_exception
 from cinder.i18n import _
 from cinder import interface
 from cinder import utils as cinder_utils
+from cinder.volume import configuration
 from cinder.volume import driver
 from cinder.volume.drivers.datacore import api
 from cinder.volume.drivers.datacore import exception as datacore_exception
 from cinder.volume.drivers.datacore import utils as datacore_utils
 from cinder.volume.drivers.san import san
 from cinder.volume import volume_types
-from cinder.volume import volume_utils
 
 LOG = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ datacore_opts = [
 ]
 
 CONF = cfg.CONF
-CONF.register_opts(datacore_opts)
+CONF.register_opts(datacore_opts, group=configuration.SHARED_CONF_GROUP)
 
 
 @interface.volumedriver
@@ -132,10 +132,6 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
             self.DATACORE_STORAGE_PROFILE_KEY: storage_profile,
             self.DATACORE_DISK_POOLS_KEY: disk_pools,
         }
-
-    @staticmethod
-    def get_driver_options():
-        return datacore_opts
 
     def check_for_setup_error(self):
         pass
@@ -272,9 +268,6 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
         """
 
         virtual_disk = self._get_virtual_disk_for(volume, raise_not_found=True)
-        LOG.error("extend_volume start")
-        LOG.error(virtual_disk)
-        LOG.error("extend_volume end")
         self._set_virtual_disk_size(virtual_disk,
                                     self._get_size_in_bytes(new_size))
         virtual_disk = self._await_virtual_disk_online(virtual_disk.Id)
@@ -401,15 +394,8 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
             reason = _('Reference must contain source-name element.')
             raise cinder_exception.ManageExistingInvalidReference(
                 existing_ref=existing_ref, reason=reason)
-        if object_type == "volume":
-            vd_alias = volume_utils.extract_id_from_volume_name(
-                existing_ref['source-name'])
-        else:
-            snapshot_name = self._unescape_snapshot(
-                existing_ref['source-name'])
-            vd_alias = volume_utils.extract_id_from_snapshot_name(
-                snapshot_name)
 
+        vd_alias = existing_ref['source-name']
         virtual_disk = datacore_utils.get_first_or_default(
             lambda disk: disk.Alias == vd_alias,
             self._api.get_virtual_disks(),
@@ -429,15 +415,7 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
             raise cinder_exception.ManageExistingInvalidReference(
                 existing_ref=existing_ref, reason=reason)
 
-        if object_type == "volume":
-            vd_alias = volume_utils.extract_id_from_volume_name(
-                existing_ref['source-name'])
-        else:
-            snapshot_name = self._unescape_snapshot(
-                existing_ref['source-name'])
-            vd_alias = volume_utils.extract_id_from_snapshot_name(
-                snapshot_name)
-
+        vd_alias = existing_ref['source-name']
         virtual_disk = datacore_utils.get_first_or_default(
             lambda disk: disk.Alias == vd_alias,
             self._api.get_virtual_disks(),
@@ -690,9 +668,6 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
             except AttributeError:
                 source_size = src_obj['volume_size']
             if volume['size'] > source_size:
-                LOG.error("_create_volume_from start new")
-                LOG.error(volume_virtual_disk)
-                LOG.error("_create_volume_from end")
                 self._set_virtual_disk_size(volume_virtual_disk,
                                             self._get_size_in_bytes(
                                                 volume['size']))
@@ -881,8 +856,3 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
 
         inner_loop = loopingcall.FixedIntervalLoopingCall(inner, time.time())
         return inner_loop.start(self.AWAIT_DISK_ONLINE_INTERVAL).wait()
-
-    def _unescape_snapshot(self, snapshot_name):
-        if not snapshot_name.startswith('_snapshot'):
-            return snapshot_name
-        return snapshot_name[1:]

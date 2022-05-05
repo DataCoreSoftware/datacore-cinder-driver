@@ -120,6 +120,7 @@ upload_logs_to_git() {
 	fi
 	cp -r $log_path .
 	error_check $? "Copying logs to cinder-tempest-logs repo"
+	$script_dir/cleanup-ci-result.sh /tmp/cinder-tempest-logs
 	git add $dirname
 	error_check $? "Adding logs to cinder-tempest-logs repo"
 	git commit -m "tempest log"

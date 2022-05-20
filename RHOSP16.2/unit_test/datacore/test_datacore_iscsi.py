@@ -138,15 +138,16 @@ class ISCSIVolumeDriverTestCase(
         config.append_config_values(iscsi.datacore_iscsi_opts)
         return config
 
-#    def test_do_setup_failed(self):
-#        super(ISCSIVolumeDriverTestCase, self).test_do_setup_failed()
-#
-#        config = self.setup_default_configuration()
-#        config.use_chap_auth = True
-#        config.datacore_iscsi_chap_storage = '/var/lib/cinder/.datacore_chap'
-#        self.assertRaises(cinder_exception.InvalidInput,
-#                          self.init_driver,
-#                          config)
+    def test_do_setup_failed(self):
+        super(ISCSIVolumeDriverTestCase, self).test_do_setup_failed()
+
+        config = self.setup_default_configuration()
+        config.use_chap_auth = True
+        config.san_ip = ''
+        config.datacore_iscsi_chap_storage = '/var/lib/cinder/.datacore_chap'
+        self.assertRaises(cinder_exception.InvalidInput,
+                          self.init_driver,
+                          config)
 
     def test_validate_connector(self):
         driver = self.init_driver(self.setup_default_configuration())

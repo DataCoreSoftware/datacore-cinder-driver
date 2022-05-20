@@ -154,16 +154,6 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
 
         return self.STORAGE_PROTOCOL
 
-    def get_volume_stats(self, refresh=False):
-        """Obtain status of the volume service.
-
-        :param refresh: Whether to get refreshed information
-        """
-
-        if refresh:
-            self._update_volume_stats()
-        return self._stats
-
     def create_volume(self, volume):
         """Creates a volume.
 
@@ -481,6 +471,7 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
             'max_over_subscription_ratio': ratio,
             'thin_provisioning_support': True,
             'thick_provisioning_support': False,
+            'online_extend_support': False,
         }
         self._stats = stats_data
 

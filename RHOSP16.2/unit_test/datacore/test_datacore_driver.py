@@ -314,6 +314,7 @@ class DataCoreVolumeDriverTestCase(object):
             'max_over_subscription_ratio': ratio,
             'thin_provisioning_support': True,
             'thick_provisioning_support': False,
+            'online_extend_support': False,
             'volume_backend_name': driver.get_volume_backend_name(),
             'driver_version': driver.get_version(),
             'storage_protocol': driver.get_storage_protocol(),

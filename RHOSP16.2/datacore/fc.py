@@ -18,6 +18,7 @@ from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_utils import excutils
 
+from cinder.common import constants
 from cinder import exception as cinder_exception
 from cinder.i18n import _
 from cinder import interface
@@ -58,8 +59,8 @@ class FibreChannelVolumeDriver(driver.DataCoreVolumeDriver):
 
     """
 
-    VERSION = '1.0.0'
-    STORAGE_PROTOCOL = 'FC'
+    VERSION = '2.0.0'
+    STORAGE_PROTOCOL = constants.FC
     CI_WIKI_NAME = 'DataCore_CI'
 
     def __init__(self, *args, **kwargs):

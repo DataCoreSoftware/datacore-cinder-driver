@@ -258,6 +258,8 @@ class DataCoreClient(object):
 
     def _process_request(self, service_client, service_binding,
                          service_endpoint, method, *args, **kwargs):
+        max_date = '9999-12-31T23:59:59.9999999'
+        r_date = '9999-12-31T23:59:59.9'
         message_id = uuid.uuid4().urn
 
         context = self._get_soap_context(
@@ -273,8 +275,10 @@ class DataCoreClient(object):
                 header=['soap-content-type: text/xml'])
             channel.send(context.envelope)
             response = channel.recv()
-            if isinstance(response, str):
-                response = response.encode('utf-8')
+            if not isinstance(response, str):
+                response = response.decode('utf-8')
+            response = response.replace(max_date, r_date)
+            response = response.encode('utf-8')
             return context.process_reply(response)
         except (socket.error, websocket.WebSocketException) as e:
             error = datacore_exceptions.DataCoreConnectionException(reason=e)

@@ -61,6 +61,7 @@ class ISCSIVolumeDriver(driver.DataCoreVolumeDriver):
     .. code-block:: none
 
         1.0.0 - Initial driver
+        2.0.0 - Reintroduce the driver
 
     """
 

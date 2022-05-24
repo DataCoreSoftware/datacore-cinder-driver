@@ -317,7 +317,7 @@ class DataCoreVolumeDriverTestCase(object):
             'online_extend_support': False,
             'volume_backend_name': driver.get_volume_backend_name(),
             'driver_version': driver.get_version(),
-            'storage_protocol': driver.get_storage_protocol(),
+            'storage_protocol': driver.STORAGE_PROTOCOL,
         }
         volume_stats = driver.get_volume_stats(refresh=True)
         self.assertDictEqual(expected_volume_stats, volume_stats)

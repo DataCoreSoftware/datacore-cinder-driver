@@ -143,16 +143,7 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
         """
 
         backend_name = self.configuration.safe_get('volume_backend_name')
-        return (backend_name or
-                'datacore_' + self.get_storage_protocol().lower())
-
-    def get_storage_protocol(self):
-        """Get storage protocol of the volume backend.
-
-        :return: Storage protocol
-        """
-
-        return self.STORAGE_PROTOCOL
+        return (backend_name or 'DataCore' + self.__class__.__name__)
 
     def create_volume(self, volume):
         """Creates a volume.
@@ -463,7 +454,7 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
             'QoS_support': False,
             'volume_backend_name': self.get_volume_backend_name(),
             'driver_version': self.get_version(),
-            'storage_protocol': self.get_storage_protocol(),
+            'storage_protocol': self.STORAGE_PROTOCOL,
             'total_capacity_gb': total_capacity_gb,
             'free_capacity_gb': free_capacity_gb,
             'provisioned_capacity_gb': provisioned_capacity_gb,

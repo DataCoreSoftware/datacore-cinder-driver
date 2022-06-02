@@ -145,6 +145,24 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
         backend_name = self.configuration.safe_get('volume_backend_name')
         return (backend_name or 'DataCore' + self.__class__.__name__)
 
+    def get_storage_protocol(self):
+        """Get storage protocol of the volume backend.
+
+        :return: Storage protocol
+        """
+
+        return self.STORAGE_PROTOCOL
+
+    def get_volume_stats(self, refresh=False):
+        """Obtain status of the volume service.
+
+        :param refresh: Whether to get refreshed information
+        """
+
+        if refresh:
+            self._update_volume_stats()
+        return self._stats
+
     def create_volume(self, volume):
         """Creates a volume.
 
@@ -355,59 +373,6 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
             for client in clients:
                 unserve_virtual_disk(client.Id)
 
-    def manage_existing(self, volume, existing_ref):
-        return self.manage_existing_object(volume, existing_ref, "volume")
-
-    def manage_existing_get_size(self, volume, existing_ref):
-        return self.manage_existing_object_get_size(volume, existing_ref,
-                                                    "volume")
-
-    def manage_existing_snapshot(self, snapshot, existing_ref):
-        return self.manage_existing_object(snapshot, existing_ref, "snapshot")
-
-    def manage_existing_snapshot_get_size(self, snapshot, existing_ref):
-        return self.manage_existing_object_get_size(snapshot, existing_ref,
-                                                    "snapshot")
-
-    def manage_existing_object(self, existing_object, existing_ref,
-                               object_type):
-        if 'source-name' not in existing_ref:
-            reason = _('Reference must contain source-name element.')
-            raise cinder_exception.ManageExistingInvalidReference(
-                existing_ref=existing_ref, reason=reason)
-
-        vd_alias = existing_ref['source-name']
-        virtual_disk = datacore_utils.get_first_or_default(
-            lambda disk: disk.Alias == vd_alias,
-            self._api.get_virtual_disks(),
-            None)
-
-        if not virtual_disk:
-            kwargs = {'existing_ref': vd_alias,
-                      'reason': 'Specified Virtual disk does not exist.'}
-            raise cinder_exception.ManageExistingInvalidReference(**kwargs)
-
-        return {'provider_location': virtual_disk.Id}
-
-    def manage_existing_object_get_size(self, existing_object, existing_ref,
-                                        object_type):
-        if 'source-name' not in existing_ref:
-            reason = _('Reference must contain source-name element.')
-            raise cinder_exception.ManageExistingInvalidReference(
-                existing_ref=existing_ref, reason=reason)
-
-        vd_alias = existing_ref['source-name']
-        virtual_disk = datacore_utils.get_first_or_default(
-            lambda disk: disk.Alias == vd_alias,
-            self._api.get_virtual_disks(),
-            None)
-
-        if not virtual_disk:
-            kwargs = {'existing_ref': vd_alias,
-                      'reason': 'Specified Virtual disk does not exist.'}
-            raise cinder_exception.ManageExistingInvalidReference(**kwargs)
-        return(self._get_size_in_gigabytes(virtual_disk.Size.Value))
-
     def _update_volume_stats(self):
         performance_data = self._api.get_performance_by_type(
             ['DiskPoolPerformance'])
@@ -454,7 +419,7 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
             'QoS_support': False,
             'volume_backend_name': self.get_volume_backend_name(),
             'driver_version': self.get_version(),
-            'storage_protocol': self.STORAGE_PROTOCOL,
+            'storage_protocol': self.get_storage_protocol(),
             'total_capacity_gb': total_capacity_gb,
             'free_capacity_gb': free_capacity_gb,
             'provisioned_capacity_gb': provisioned_capacity_gb,
@@ -462,7 +427,7 @@ class DataCoreVolumeDriver(driver.VolumeDriver):
             'max_over_subscription_ratio': ratio,
             'thin_provisioning_support': True,
             'thick_provisioning_support': False,
-            'online_extend_support': False,
+            'multiattach': False,
         }
         self._stats = stats_data
 

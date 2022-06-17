@@ -10,13 +10,16 @@ script_dir=`dirname $0`
 tempest_path="/opt/stack/tempest/"
 run_type="--parallel"
 failed_run=0
-#concurrency="--concurrency 38"
+concurrency="--concurrency 4"
 #tests="tempest.api.compute.|tempest.api.volume.|tempest.scenario.|tempest.api.image."
 tests="tempest.api.volume."
 GERRIT_CHANGE_NUMBER="$2"
 GERRIT_PATCHSET_NUMBER="$3"
 GERRIT_REFSPEC="$4"
+UPLOAD_STARTED=0
 
+# Jenkins will run this script and redirect all the logs to /tmp/console.log
+> /tmp/console.log >>/dev/null
 
 if [ $script_dir == "." ]; then
 	script_dir=`pwd`
@@ -24,13 +27,16 @@ fi
 mkdir -p $log_path
 echo "Source the openrc file"
 source /opt/stack/devstack/openrc admin admin
-
 error_check() {
 	err=$1
 	msg=$2
 	if [ $err -ne 0 ]; then
 		echo "$msg [ FAILED ]"
-		exit 1
+		if [ $UPLOAD_STARTED -eq 0 ]; then
+			UPLOAD_STARTED=1
+			upload_logs_to_git
+			exit 1
+		fi
 	fi
 	echo "$msg [ PASSED ]"
 }
@@ -91,6 +97,12 @@ start_tempest() {
 		if [ $failed_run -eq 0 ]; then
 			failed_run=`cat $log_path/iscsi_driver_test.log | grep "... FAILED" | wc -l`
 		fi
+		iscsi_failed_run=`cat $log_path/iscsi_driver_test.log | grep "... FAILED" | wc -l`
+		if [ $iscsi_failed_run -eq 0 ]; then
+			echo "Tempest DataCore iSCSI Driver [ PASSED ]"
+		else
+			echo "Tempest DataCore iSCSI Driver [ FAILED ]"
+		fi
 	else
 		echo "Starting tempest for Fiber Channel driver"
 		cp fc_tempest.conf /opt/stack/tempest/etc/tempest.conf
@@ -101,6 +113,12 @@ start_tempest() {
 		tempest run --load-list /tmp/test_details $run_type $concurrency > $log_path/fc_driver_test.log
 		if [ $failed_run -eq 0 ]; then
 			failed_run=`cat $log_path/fc_driver_test.log | grep "... FAILED" | wc -l`
+		fi
+		fc_failed_run=`cat $log_path/fc_driver_test.log | grep "... FAILED" | wc -l`
+		if [ $fc_failed_run -eq 0 ]; then
+			echo "Tempest DataCore Fiber Channel Driver [ PASSED ]"
+		else
+			echo "Tempest DataCore Fiber Channel Driver [ FAILED ]"
 		fi
 	fi
 }
@@ -118,7 +136,12 @@ upload_logs_to_git() {
 		git pull
 		error_check $? "Updating cinder-tempest-logs repo"
 	fi
+	if [ -f /tmp/console.log ]; then
+		cp /tmp/console.log $log_path
+	fi
+
 	cp -r $log_path .
+
 	error_check $? "Copying logs to cinder-tempest-logs repo"
 	$script_dir/cleanup-ci-result.sh /tmp/cinder-tempest-logs
 	git add $dirname
@@ -139,9 +162,18 @@ detach_disk() {
 
 update_cinder () {
 	cd $script_dir
-	./checkout-patchset.sh "$GERRIT_CHANGE_NUMBER $GERRIT_PATCHSET_NUMBER $GERRIT_REFSPEC"
+	./checkout-patchset.sh "$GERRIT_CHANGE_NUMBER" "$GERRIT_PATCHSET_NUMBER" "$GERRIT_REFSPEC"
 	error_check $? "checkout patchset"
 }
+
+copy_default_conf () {
+	cd $script_dir
+	cp iscsi_fc_cinder.conf /etc/cinder/cinder.conf
+	sleep 2
+	sudo systemctl restart  devstack@c-vol.service
+}
+
+echo "Patch Details: GERRIT_CHANGE_NUMBER: $GERRIT_CHANGE_NUMBER GERRIT_PATCHSET_NUMBER: $GERRIT_PATCHSET_NUMBER GERRIT_REFSPEC: $GERRIT_REFSPEC"
 
 echo "Updating cinder code"
 update_cinder
@@ -159,6 +191,8 @@ update_cinder_info "fc"
 start_tempest "fc"
 
 upload_logs_to_git
+
+copy_default_conf
 
 rm -rf $log_path
 

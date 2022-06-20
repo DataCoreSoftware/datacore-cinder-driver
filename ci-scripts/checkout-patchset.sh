@@ -6,6 +6,7 @@ url="https://opendev.org/openstack/cinder.git"
 GERRIT_CHANGE_NUMBER="$1"
 GERRIT_PATCHSET_NUMBER="$2"
 GERRIT_REFSPEC="$3"
+FROM_JENKINS="$4"
 
 error_check() {
 	status=$1
@@ -31,23 +32,27 @@ if [ ! -d $destination ]; then
 	exit 1
 fi
 
+# This sleep is reqiered because, when the event comes from Gerrit the patchset is not 
+# compleatly ready and the below git fetch fails
+if [ $FROM_JENKINS -eq  1 ]; then
+	sleep 60
+fi
 cd $destination
 git checkout master
 error_check $? "git checkout cinder master"
 git pull
 error_check $? "git pull"
 
-delete_prev_patch
+if [ ! -z $GERRIT_CHANGE_NUMBER ]; then
+	delete_prev_patch
 
-# This will be enabled once DataCore Driver is upstreamed
-#<<COMM
-changeBranch="change-${GERRIT_CHANGE_NUMBER}-${GERRIT_PATCHSET_NUMBER}"
-echo "changeBranch: $changeBranch"
-git fetch origin ${GERRIT_REFSPEC}:${changeBranch}
-error_check $? "git fetch origin $GERRIT_REFSPEC:$changeBranch"
-git checkout ${changeBranch}
-error_check $? "git checkout $changeBranch"
-#COMM
+	changeBranch="change-${GERRIT_CHANGE_NUMBER}-${GERRIT_PATCHSET_NUMBER}"
+	echo "changeBranch: $changeBranch"
+	git fetch origin ${GERRIT_REFSPEC}:${changeBranch}
+	error_check $? "git fetch origin $GERRIT_REFSPEC:$changeBranch"
+	git checkout ${changeBranch}
+	error_check $? "git checkout $changeBranch"
+fi
 
 # checkout tempest
 cd $tempest

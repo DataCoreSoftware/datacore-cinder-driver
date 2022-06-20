@@ -10,12 +10,15 @@ script_dir=`dirname $0`
 tempest_path="/opt/stack/tempest/"
 run_type="--parallel"
 failed_run=0
+DEFAULTVALUE=0
 concurrency="--concurrency 4"
 #tests="tempest.api.compute.|tempest.api.volume.|tempest.scenario.|tempest.api.image."
 tests="tempest.api.volume."
 GERRIT_CHANGE_NUMBER="$2"
 GERRIT_PATCHSET_NUMBER="$3"
 GERRIT_REFSPEC="$4"
+#FROM_JENKINS="$5"
+FROM_JENKINS="${5:-$DEFAULTVALUE}"
 UPLOAD_STARTED=0
 
 # Jenkins will run this script and redirect all the logs to /tmp/console.log
@@ -162,7 +165,7 @@ detach_disk() {
 
 update_cinder () {
 	cd $script_dir
-	./checkout-patchset.sh "$GERRIT_CHANGE_NUMBER" "$GERRIT_PATCHSET_NUMBER" "$GERRIT_REFSPEC"
+	./checkout-patchset.sh "$GERRIT_CHANGE_NUMBER" "$GERRIT_PATCHSET_NUMBER" "$GERRIT_REFSPEC" "$FROM_JENKINS"
 	error_check $? "checkout patchset"
 }
 

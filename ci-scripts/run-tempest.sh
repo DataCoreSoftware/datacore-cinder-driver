@@ -80,6 +80,21 @@ update_cinder_info() {
 
 }
 
+update_tempest_config() {
+
+	source /opt/stack/devstack/openrc  admin admin
+	public_net_id=`openstack network list| grep public| awk {'print $2'}`
+	image_id=`openstack image list | grep "cirros-0.5.2-x86_64-disk" | awk {'print $2'}`
+
+	for file in "iscsi_tempest.conf fc_tempest.conf"
+	do
+		sed -i 's/public_network_id =.*/public_network_id = '$public_net_id'/' $file
+		sed -i 's/image_ref_alt =.*/image_ref_alt = '$image_id'/' $file
+		sed -i 's/image_ref =.*/image_ref = '$image_id'/' $file
+	done
+}
+
+
 start_tempest() {
 	ctype=$1
 	cd $tempest_path
@@ -164,9 +179,11 @@ detach_disk() {
 }
 
 update_cinder () {
-	cd $script_dir
-	./checkout-patchset.sh "$GERRIT_CHANGE_NUMBER" "$GERRIT_PATCHSET_NUMBER" "$GERRIT_REFSPEC" "$FROM_JENKINS"
-	error_check $? "checkout patchset"
+	if [ ! -z $GERRIT_CHANGE_NUMBER ]; then
+		cd $script_dir
+		./checkout-patchset.sh "$GERRIT_CHANGE_NUMBER" "$GERRIT_PATCHSET_NUMBER" "$GERRIT_REFSPEC" "$FROM_JENKINS"
+		error_check $? "checkout patchset"
+	fi
 }
 
 copy_default_conf () {
@@ -178,8 +195,10 @@ copy_default_conf () {
 
 echo "Patch Details: GERRIT_CHANGE_NUMBER: $GERRIT_CHANGE_NUMBER GERRIT_PATCHSET_NUMBER: $GERRIT_PATCHSET_NUMBER GERRIT_REFSPEC: $GERRIT_REFSPEC"
 
-echo "Updating cinder code"
+echo "Fetching latest cinder patch"
 update_cinder
+echo "Updating tempest config"
+update_tempest_config
 
 echo "Clearing logs"
 sudo journalctl  --unit  devstack@c-vol.service  --vacuum-time=1s >> /dev/null 2>&1

@@ -35,6 +35,7 @@ fi
 # This sleep is reqiered because, when the event comes from Gerrit the patchset is not 
 # compleatly ready and the below git fetch fails
 if [ $FROM_JENKINS -eq  1 ]; then
+	echo "Waiting for patchset. FROM_JENKINS: $FROM_JENKINS"
 	sleep 60
 fi
 cd $destination

@@ -181,6 +181,8 @@ detach_disk() {
 update_cinder () {
 	if [ ! -z $GERRIT_CHANGE_NUMBER ]; then
 		cd $script_dir
+		./update-devstack.sh
+		error_check $? "update DevStack"
 		./checkout-patchset.sh "$GERRIT_CHANGE_NUMBER" "$GERRIT_PATCHSET_NUMBER" "$GERRIT_REFSPEC" "$FROM_JENKINS"
 		error_check $? "checkout patchset"
 	fi

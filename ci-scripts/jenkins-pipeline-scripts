@@ -8,8 +8,8 @@ pipeline {
                 script {
                    def now = new Date()
                    dir_name=now.format("yy-MM-dd-HH-mm-ss")
-                   sh "/opt/upstream/pipeline/run-tempest.sh $BUILD_DISPLAY_NAME $GERRIT_CHANGE_NUMBER $GERRIT_PATCHSET_NUMBER $GERRIT_REFSPEC"
-                }
+                   sh "/opt/upstream/pipeline/run-tempest.sh $BUILD_DISPLAY_NAME $GERRIT_CHANGE_NUMBER $GERRIT_PATCHSET_NUMBER $GERRIT_REFSPEC $GERRIT_PROJECT 1 > /tmp/console.log 2>&1 "
+              }
             }
         }
     }

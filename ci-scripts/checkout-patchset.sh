@@ -1,12 +1,20 @@
 #!/bin/bash
 
-destination="/opt/stack/cinder/"
 tempest="/opt/stack/tempest/"
 url="https://opendev.org/openstack/cinder.git"
 GERRIT_CHANGE_NUMBER="$1"
 GERRIT_PATCHSET_NUMBER="$2"
 GERRIT_REFSPEC="$3"
 FROM_JENKINS="$4"
+GERRIT_PROJECT="$5"
+
+echo $GERRIT_PROJECT | grep "openstack/os-brick"
+if [ $? -eq 0 ]; then
+	repo=os-brick
+else
+	repo=cinder
+fi
+destination="/opt/stack/$repo"
 
 error_check() {
 	status=$1

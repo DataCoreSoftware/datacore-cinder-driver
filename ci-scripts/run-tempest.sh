@@ -17,8 +17,8 @@ tests="tempest.api.volume."
 GERRIT_CHANGE_NUMBER="$2"
 GERRIT_PATCHSET_NUMBER="$3"
 GERRIT_REFSPEC="$4"
-#FROM_JENKINS="$5"
-FROM_JENKINS="${5:-$DEFAULTVALUE}"
+GERRIT_PROJECT=$5
+FROM_JENKINS="${6:-$DEFAULTVALUE}"
 UPLOAD_STARTED=0
 
 # Jenkins will run this script and redirect all the logs to /tmp/console.log
@@ -183,7 +183,7 @@ update_cinder () {
 		cd $script_dir
 		./update-devstack.sh
 		error_check $? "update DevStack"
-		./checkout-patchset.sh "$GERRIT_CHANGE_NUMBER" "$GERRIT_PATCHSET_NUMBER" "$GERRIT_REFSPEC" "$FROM_JENKINS"
+		./checkout-patchset.sh "$GERRIT_CHANGE_NUMBER" "$GERRIT_PATCHSET_NUMBER" "$GERRIT_REFSPEC" "$FROM_JENKINS" "$GERRIT_PROJECT"
 		error_check $? "checkout patchset"
 	fi
 }
@@ -195,7 +195,7 @@ copy_default_conf () {
 	sudo systemctl restart  devstack@c-vol.service
 }
 
-echo "Patch Details: GERRIT_CHANGE_NUMBER: $GERRIT_CHANGE_NUMBER GERRIT_PATCHSET_NUMBER: $GERRIT_PATCHSET_NUMBER GERRIT_REFSPEC: $GERRIT_REFSPEC"
+echo "Patch Details: GERRIT_CHANGE_NUMBER: $GERRIT_CHANGE_NUMBER GERRIT_PATCHSET_NUMBER: $GERRIT_PATCHSET_NUMBER GERRIT_REFSPEC: $GERRIT_REFSPEC GERRIT_PROJECT: $GERRIT_PROJECT"
 
 echo "Fetching latest cinder patch"
 update_cinder

@@ -67,6 +67,5 @@ fi
 cd $tempest
 git pull
 
-sudo systemctl restart "devstack@*"
-sleep 10
+sudo systemctl restart  devstack@*
 

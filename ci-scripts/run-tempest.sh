@@ -20,7 +20,13 @@ GERRIT_REFSPEC="$4"
 GERRIT_PROJECT=$5
 FROM_JENKINS="${6:-$DEFAULTVALUE}"
 UPLOAD_STARTED=0
+SECONDS=0
 
+whoami | grep stack >> /dev/null
+if [ $? -ne 0 ]; then
+	echo "Please run as stack user"
+	exit 1
+fi
 # Jenkins will run this script and redirect all the logs to /tmp/console.log
 > /tmp/console.log >>/dev/null
 
@@ -29,6 +35,7 @@ if [ $script_dir == "." ]; then
 fi
 mkdir -p $log_path
 echo "Source the openrc file"
+
 source /opt/stack/devstack/openrc admin admin
 error_check() {
 	err=$1
@@ -98,6 +105,7 @@ update_tempest_config() {
 start_tempest() {
 	ctype=$1
 	cd $tempest_path
+	stestr init
 	tempest run --list-tests | grep -E $tests > /tmp/test_details
 	if [ ! -s /tmp/test_details ]; then
 		error_check 1 "Test file validation"
@@ -117,7 +125,7 @@ start_tempest() {
 		fi
 		iscsi_failed_run=`cat $log_path/iscsi_driver_test.log | grep "... FAILED" | wc -l`
 		if [ $iscsi_failed_run -eq 0 ]; then
-			echo "Tempest DataCore iSCSI Driver [ PASSED ]"
+			echo "Tempest DataCore iSCSI Driver [ PASSED ]. Time taken $(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds."
 		else
 			echo "Tempest DataCore iSCSI Driver [ FAILED ]"
 		fi
@@ -134,7 +142,7 @@ start_tempest() {
 		fi
 		fc_failed_run=`cat $log_path/fc_driver_test.log | grep "... FAILED" | wc -l`
 		if [ $fc_failed_run -eq 0 ]; then
-			echo "Tempest DataCore Fiber Channel Driver [ PASSED ]"
+			echo "Tempest DataCore Fiber Channel Driver [ PASSED ]. Time taken $(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds."
 		else
 			echo "Tempest DataCore Fiber Channel Driver [ FAILED ]"
 		fi
@@ -181,10 +189,17 @@ detach_disk() {
 update_cinder () {
 	if [ ! -z $GERRIT_CHANGE_NUMBER ]; then
 		cd $script_dir
-		./update-devstack.sh
-		error_check $? "update DevStack"
+		./stop-devstack.sh
+		error_check $? "Stop DevStack"
+		#./update-devstack.sh
+		#error_check $? "Update DevStack"
+		./start-devstack.sh $script_dir
+		error_check $? "Start DevStack"
 		./checkout-patchset.sh "$GERRIT_CHANGE_NUMBER" "$GERRIT_PATCHSET_NUMBER" "$GERRIT_REFSPEC" "$FROM_JENKINS" "$GERRIT_PROJECT"
-		error_check $? "checkout patchset"
+		error_check $? "Checkout patchset"
+		echo "##########################################################################"
+		echo "DevStack Installation Took $(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds."
+		echo "##########################################################################"
 	fi
 }
 
@@ -217,6 +232,10 @@ start_tempest "fc"
 upload_logs_to_git
 
 copy_default_conf
+
+echo "##########################################################################"
+echo "Execution Took $(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds."
+echo "##########################################################################"
 
 rm -rf $log_path
 

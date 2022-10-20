@@ -203,11 +203,18 @@ update_cinder () {
 	fi
 }
 
+generate_cinder_config() {
+	cd $script_dir
+	./create-dccinder-config.sh
+	error_check $? "Generating Cinder config"
+}
+
 copy_default_conf () {
 	cd $script_dir
 	cp iscsi_fc_cinder.conf /etc/cinder/cinder.conf
 	sleep 2
 	sudo systemctl restart  devstack@c-vol.service
+	rm -rf fc_cinder.conf  iscsi_cinder.conf  iscsi_fc_cinder.conf
 }
 
 echo "Patch Details: GERRIT_CHANGE_NUMBER: $GERRIT_CHANGE_NUMBER GERRIT_PATCHSET_NUMBER: $GERRIT_PATCHSET_NUMBER GERRIT_REFSPEC: $GERRIT_REFSPEC GERRIT_PROJECT: $GERRIT_PROJECT"
@@ -222,6 +229,7 @@ sudo journalctl  --unit  devstack@c-vol.service  --vacuum-time=1s >> /dev/null 2
 
 detach_disk
 
+generate_cinder_config
 echo $log_path
 update_cinder_info "iscsi"
 start_tempest "iscsi"

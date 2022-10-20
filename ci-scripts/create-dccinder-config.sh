@@ -23,7 +23,6 @@ volume_backend_name=datacore_iscsi1
 volume_driver=cinder.volume.drivers.datacore.iscsi.ISCSIVolumeDriver
 backend_host=hostgroup"
 
-
 lvm_config="image_volume_cache_enabled = True
 volume_clear = zero
 lvm_type = auto
@@ -31,6 +30,7 @@ target_helper = lioadm
 volume_group = stack-volumes-lvmdriver-1
 volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
 volume_backend_name = lvmdriver-1"
+
 
 iscsi_fc_cinder="iscsi_fc_cinder.conf"
 fc_cinder_conf="fc_cinder.conf"
@@ -46,7 +46,17 @@ fi
 
 create_base_config() {
 	rm -rf /tmp/base_cinder_config
-	cat $cinder_config | grep -v "$iscsi_config" | grep -v "$fc_config" |  grep -v "datacore_iscsi1" | grep -v "datacore_fc1" | grep -v "$lvm_config" | grep -v "\[lvmdriver-1\]" > /tmp/base_cinder_config
+	while read line
+	do
+		echo "$line" | grep "^\[" >> /dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			parant="$line"
+		fi
+		if [[ "$parant" == "[lvmdriver-1]" || "$parant" == "[datacore_iscsi1]" || "$parant" == "[datacore_fc1]" ]]; then
+			continue
+		fi
+		echo "$line" >> /tmp/base_cinder_config
+	done < $cinder_config
 }
 
 add_default_vol_type() {
@@ -69,9 +79,9 @@ create_datacore_cinder_config() {
 		exit 
 	fi
 
-	if [ -f $iscsi_cinder_conf ]; then
-		cp $iscsi_cinder_conf $iscsi_cinder_conf\.back
-	fi
+#	if [ -f $iscsi_cinder_conf ]; then
+#		cp $iscsi_cinder_conf $iscsi_cinder_conf\.back
+#	fi
 	cp /tmp/base_cinder_config $iscsi_cinder_conf
 	cp /tmp/base_cinder_config $fc_cinder_conf
 	cp /tmp/base_cinder_config $iscsi_fc_cinder

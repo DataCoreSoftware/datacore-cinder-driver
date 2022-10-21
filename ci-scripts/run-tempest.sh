@@ -170,6 +170,15 @@ upload_logs_to_git() {
 
 	error_check $? "Copying logs to cinder-tempest-logs repo"
 	$script_dir/cleanup-ci-result.sh /tmp/cinder-tempest-logs
+	#
+	# Remove IP address and password from the logs
+	#
+
+	passwd=`cat $dirname/iscsi_cinder.conf | grep "password ="|head -1| awk {'print $3'}`
+	sed -i 's/'$passwd'/****/g' $dirname/*
+	sed -i 's/[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}/127.0.0.1/g' $dirname/*
+
+
 	git add $dirname
 	error_check $? "Adding logs to cinder-tempest-logs repo"
 	git commit -m "tempest log"
@@ -214,7 +223,7 @@ copy_default_conf () {
 	cp iscsi_fc_cinder.conf /etc/cinder/cinder.conf
 	sleep 2
 	sudo systemctl restart  devstack@c-vol.service
-	rm -rf fc_cinder.conf  iscsi_cinder.conf  iscsi_fc_cinder.conf
+	rm -rf fc_cinder.conf  iscsi_cinder.conf  iscsi_fc_cinder.conf 
 }
 
 echo "Patch Details: GERRIT_CHANGE_NUMBER: $GERRIT_CHANGE_NUMBER GERRIT_PATCHSET_NUMBER: $GERRIT_PATCHSET_NUMBER GERRIT_REFSPEC: $GERRIT_REFSPEC GERRIT_PROJECT: $GERRIT_PROJECT"
